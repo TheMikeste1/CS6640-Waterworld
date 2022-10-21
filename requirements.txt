@@ -1,0 +1,4 @@
+pettingzoo[sisl]~=1.22.0
+pygame~=2.1.2
+pymunk~=6.2.1
+scipy~=1.9.3

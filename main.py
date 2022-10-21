@@ -1,5 +1,6 @@
 import pettingzoo.sisl.waterworld_v4
-
+# Link to environment base class:
+# from pettingzoo.sisl.waterworld.waterworld_base import WaterworldBase
 
 @property
 def base_env(self) -> pettingzoo.sisl.waterworld_v4.env:

@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 import cv2
-import imageio
 import pettingzoo as pz
 from pettingzoo.sisl import waterworld_v4 as waterworld
 

@@ -2,4 +2,3 @@
 pettingzoo
 scipy~=1.9.3
 opencv-python
-imageio

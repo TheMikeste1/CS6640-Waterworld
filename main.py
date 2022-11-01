@@ -5,7 +5,7 @@ import pettingzoo as pz
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
 import custom_waterworld
-from custom_waterworld.waterworld_arguments import WaterworldArguments
+from custom_waterworld import WaterworldArguments
 
 
 def run_episode_with_video(env: pz.AECEnv, agents, memory):
@@ -62,11 +62,12 @@ def run_iteration(
 def main():
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.RGB,
+        render_mode=WaterworldArguments.RenderMode.HUMAN,
         n_poisons=128,
         max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
+    runner = custom_waterworld.Runner(env)
     print(f"Running at {env.unwrapped.env.FPS} FPS")
 
     agents = []
@@ -77,7 +78,7 @@ def main():
 
     # noinspection PyBroadException
     try:
-        run_episode(env, None, None)
+        runner.run_episode()
     except KeyboardInterrupt:
         pass
     finally:

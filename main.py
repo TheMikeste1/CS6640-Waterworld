@@ -3,16 +3,20 @@ from collections import defaultdict
 import cv2
 import imageio
 import pettingzoo as pz
+from pettingzoo.sisl import waterworld_v4 as waterworld
 
 import custom_waterworld
 from custom_waterworld.waterworld_arguments import WaterworldArguments
 
 
 def run_episode_with_video(env: pz.AECEnv, agents, memory):
+    if env.unwrapped.env.render_mode != WaterworldArguments.RenderMode.RGB.value:
+        raise ValueError("Video recording only works with RGB render mode")
+
     rewards = defaultdict(list)
     env.reset()
     out = env.render()
-    fps = env.base_env.FPS
+    fps = env.unwrapped.env.FPS
     vw = cv2.VideoWriter(
         "output.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, out.shape[:-1], True
     )
@@ -63,8 +67,8 @@ def main():
         n_poisons=128,
         max_cycles=512,
     )
-    env = custom_waterworld.waterworld.env(**args.to_dict())
-    print(f"Running at {env.base_env.FPS} FPS")
+    env = waterworld.env(**args.to_dict())
+    print(f"Running at {env.unwrapped.env.FPS} FPS")
 
     agents = []
     memory = None

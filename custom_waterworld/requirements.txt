@@ -1,0 +1,4 @@
+box2d-py
+pettingzoo[sisl]~=1.22.1
+pymunk
+swig

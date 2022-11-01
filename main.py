@@ -30,13 +30,13 @@ def run_episode_with_video(env: pz.AECEnv, agents, memory):
 def run_episode(env: pz.AECEnv, agents, memory):
     rewards = defaultdict(list)
     env.reset()
-    out = env.render()
+    env.render()
     for agent in env.agent_iter():
         obs, reward, terminated, truncated, info = env.last()
         rewards[agent].append(reward)
         action = None if terminated or truncated else env.action_space(agent).sample()
         env.step(action)
-        out = env.render()
+        env.render()
 
 
 def run_iteration(

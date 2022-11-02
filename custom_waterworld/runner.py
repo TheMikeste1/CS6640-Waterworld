@@ -7,7 +7,7 @@ import pettingzoo as pz
 
 import numpy as np
 
-from custom_waterworld.Event import Event
+from custom_waterworld.event import Event
 
 if TYPE_CHECKING:
     from agents import AbstractAgent
@@ -102,3 +102,4 @@ class Runner:
     def run_iterations(self, iterations: int):
         for _ in range(iterations):
             rewards = self.run_episode()
+        self._on_finished_iterations()

@@ -38,3 +38,6 @@ class Event:
     def __isub__(self, other):
         self.unsubscribe(other)
         return self
+
+    def __len__(self):
+        return len(self._callbacks)

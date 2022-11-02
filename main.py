@@ -5,7 +5,6 @@ import pettingzoo as pz
 import torch.nn
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
-from agents import RandomAgent
 import custom_waterworld
 from agents.nn_agent import NNAgent
 from custom_waterworld import WaterworldArguments
@@ -45,7 +44,7 @@ def run_iteration(
 def main():
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.HUMAN,
+        render_mode=WaterworldArguments.RenderMode.RGB,
         max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
@@ -68,7 +67,17 @@ def main():
             return x
 
     # Create agents
-    agent = NNAgent(env, model=SimpleNN(), auto_select_device=False)
+    network = SimpleNN()
+    optimizer = torch.optim.Adam(network.parameters(), lr=0.001)
+    criterion = torch.nn.MSELoss()
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.9)
+    agent = NNAgent(
+        env,
+        model=network,
+        optimizer=optimizer,
+        loss=criterion,
+        lr_scheduler=lr_scheduler,
+    )
 
     runner = custom_waterworld.Runner(
         env,
@@ -77,12 +86,15 @@ def main():
             "pursuer_1": agent,
         },
     )
-    print(f"Running at {env.unwrapped.env.FPS} FPS")
+    if args.render_mode == WaterworldArguments.RenderMode.HUMAN:
+        print(f"Running at {env.unwrapped.env.FPS} FPS")
+    else:
+        print(f"Running in the background")
 
-    memory = None
-    criterion = None
-    lr_scheduler = None
-    batch_size = 1
+    runner.on_step += lambda r, name, data: agent.memory.add(
+        (data.state, data.action, data.reward, data.next_state, data.terminated)
+    )
+    runner.on_post_episode += lambda *_: agent.update(64)
 
     # width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
     # vw = VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")
@@ -91,7 +103,7 @@ def main():
 
     # noinspection PyBroadException
     try:
-        runner.run_episode()
+        runner.run_iterations(8)
     except KeyboardInterrupt:
         print("Run interrupted")
     finally:

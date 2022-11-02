@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 
 class Runner:
+    __slots__ = ("env", "agents", "on_render")
+
     def __init__(
         self,
         env: pz.AECEnv,

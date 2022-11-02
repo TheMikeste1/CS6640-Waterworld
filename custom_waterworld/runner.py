@@ -13,16 +13,17 @@ if TYPE_CHECKING:
 
 
 class Runner:
-    __slots__ = ("env", "agents", "on_render", "on_post_episode")
+    __slots__ = (
+        "env",
+        "agents",
+        "_on_render_callbacks",
+        "_on_post_episode_callbacks",
+    )
 
     def __init__(
         self,
         env: pz.AECEnv,
         agents: Dict[str, AbstractAgent],
-        on_render: Callable[[Runner, Union[np.array, None]], None] = lambda *_: None,
-        on_post_episode: Callable[
-            [Runner, Dict[str, list[float]]], None
-        ] = lambda *_: None,
     ):
         if not isinstance(env, pz.utils.BaseWrapper):
             # Wrap the environment so we can use .unwrap without warnings
@@ -44,8 +45,17 @@ class Runner:
             )
         self.env = env
         self.agents = agents
-        self.on_render = on_render
-        self.on_post_episode = on_post_episode
+        self._on_render_callbacks = set()
+        self._on_post_episode_callbacks = set()
+
+    def _render(self):
+        out = self.env.render()
+        for callback in self._on_render_callbacks:
+            callback(self, out)
+
+    def _on_post_episode(self, rewards: Dict[str, list[float]]):
+        for callback in self._on_post_episode_callbacks:
+            callback(self, rewards)
 
     def run_episode(self):
         env = self.env
@@ -55,7 +65,6 @@ class Runner:
         num_agents = env.num_agents
 
         render_out = env.render()
-        self.on_render(self, render_out)
         for i, agent_name in enumerate(env.agent_iter(), start=1):
             obs, reward, terminated, truncated, info = env.last()
             rewards[agent_name].append(reward)
@@ -64,11 +73,30 @@ class Runner:
             action = None if terminated or truncated else action
             env.step(action)
             if i % num_agents == 0:
-                render_out = env.render()
-                self.on_render(self, render_out)
-        self.on_post_episode(self, rewards)
+                self._render()
+        self._on_post_episode(rewards)
         return rewards
 
     def run_iterations(self, iterations: int):
         for _ in range(iterations):
             rewards = self.run_episode()
+
+    def subscribe_render(
+        self, callback: Callable[[Runner, Union[np.array, None]], None]
+    ):
+        self._on_render_callbacks.add(callback)
+
+    def unsubscribe_render(
+        self, callback: Callable[[Runner, Union[np.array, None]], None]
+    ):
+        self._on_render_callbacks.remove(callback)
+
+    def subscribe_post_episode(
+        self, callback: Callable[[Runner, Dict[str, list[float]]], None]
+    ):
+        self._on_post_episode_callbacks.add(callback)
+
+    def unsubscribe_post_episode(
+        self, callback: Callable[[Runner, Dict[str, list[float]]], None]
+    ):
+        self._on_post_episode_callbacks.remove(callback)

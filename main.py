@@ -23,24 +23,6 @@ class VideoWriter:
         self.vw.release()
 
 
-def run_episode_with_video(env: pz.AECEnv, agents, memory):
-
-    rewards = defaultdict(list)
-    env.reset()
-    out = env.render()
-    fps = env.unwrapped.env.FPS
-
-    vw.write(out)
-    for agent in env.agent_iter():
-        obs, reward, terminated, truncated, info = env.last()
-        rewards[agent].append(reward)
-        action = None if terminated or truncated else env.action_space(agent).sample()
-        env.step(action)
-        out = env.render()
-        vw.write(cv2.cvtColor(out, cv2.COLOR_RGB2BGR))
-    vw.release()
-
-
 def run_iteration(
     env: pz.AECEnv, agents, memory, criterion, lr_scheduler, batch_size: int
 ):
@@ -66,19 +48,13 @@ def main():
         max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
-    env.reset()
-    out = env.render()
-    height = out.shape[0]
-    width = out.shape[1]
-    vw = VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")
+
     runner = custom_waterworld.Runner(
         env,
         agents={
             "pursuer_0": RandomAgent(env),
             "pursuer_1": RandomAgent(env),
         },
-        on_render=lambda x, y: vw.write(y),
-        on_post_episode=lambda *_: vw.close(),
     )
     print(f"Running at {env.unwrapped.env.FPS} FPS")
 
@@ -88,6 +64,11 @@ def main():
     lr_scheduler = None
     batch_size = 1
 
+    # width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
+    # vw = VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")
+    # runner.subscribe_render(lambda x, y: vw.write(y))
+    # runner.subscribe_post_episode(lambda *_: vw.close())
+
     # noinspection PyBroadException
     try:
         runner.run_episode()
@@ -95,7 +76,7 @@ def main():
         print("Run interrupted")
     finally:
         env.close()
-        vw.close()
+        # vw.close()
 
 
 if __name__ == "__main__":

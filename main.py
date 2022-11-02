@@ -75,7 +75,7 @@ def main():
     try:
         runner.run_episode()
     except KeyboardInterrupt:
-        pass
+        print("Run interrupted")
     finally:
         env.close()
 

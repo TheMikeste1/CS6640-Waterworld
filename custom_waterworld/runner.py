@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Callable, Dict, TYPE_CHECKING
+from typing import Any, Callable, Dict, TYPE_CHECKING, Union
 
 import pettingzoo as pz
 
@@ -13,13 +13,16 @@ if TYPE_CHECKING:
 
 
 class Runner:
-    __slots__ = ("env", "agents", "on_render")
+    __slots__ = ("env", "agents", "on_render", "on_post_episode")
 
     def __init__(
         self,
         env: pz.AECEnv,
         agents: Dict[str, AbstractAgent],
-        on_render: Callable[[pz.utils.BaseWrapper, np.array], None] = lambda *_: None,
+        on_render: Callable[[Runner, Union[np.array | None]], None] = lambda *_: None,
+        on_post_episode: Callable[
+            [pz.utils.BaseWrapper, Dict[str, list[float]]], None
+        ] = lambda *_: None,
     ):
         if not isinstance(env, pz.utils.BaseWrapper):
             # Wrap the environment so we can use .unwrap without warnings
@@ -42,6 +45,7 @@ class Runner:
         self.env = env
         self.agents = agents
         self.on_render = on_render
+        self.on_post_episode = on_post_episode
 
     def run_episode(self):
         env = self.env
@@ -59,3 +63,9 @@ class Runner:
             env.step(action)
             render_out = env.render()
             self.on_render(env, render_out)
+        return rewards
+
+    def run_iterations(self, iterations: int):
+        for _ in range(iterations):
+            rewards = self.run_episode()
+            self.on_post_episode(self, rewards)

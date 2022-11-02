@@ -4,6 +4,7 @@ import cv2
 import pettingzoo as pz
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
+from agents import RandomAgent
 import custom_waterworld
 from custom_waterworld import WaterworldArguments
 
@@ -30,23 +31,11 @@ def run_episode_with_video(env: pz.AECEnv, agents, memory):
     vw.release()
 
 
-def run_episode(env: pz.AECEnv, agents, memory):
-    rewards = defaultdict(list)
-    env.reset()
-    env.render()
-    for agent in env.agent_iter():
-        obs, reward, terminated, truncated, info = env.last()
-        rewards[agent].append(reward)
-        action = None if terminated or truncated else env.action_space(agent).sample()
-        env.step(action)
-        env.render()
-
-
 def run_iteration(
     env: pz.AECEnv, agents, memory, criterion, lr_scheduler, batch_size: int
 ):
     # Run an epoch
-    run_episode(env, agents, memory)
+    # run_episode(env, agents, memory)
 
     # Perform updates
     error = {}
@@ -67,7 +56,13 @@ def main():
         max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
-    runner = custom_waterworld.Runner(env)
+    runner = custom_waterworld.Runner(
+        env,
+        agents={
+            "pursuer_0": RandomAgent(env),
+            "pursuer_1": RandomAgent(env),
+        },
+    )
     print(f"Running at {env.unwrapped.env.FPS} FPS")
 
     agents = []

@@ -1,5 +1,5 @@
 box2d-py
 numpy
-pettingzoo[sisl]
+pettingzoo[sisl]~=1.22.1
 pymunk
 swig

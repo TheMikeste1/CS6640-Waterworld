@@ -43,8 +43,7 @@ def run_iteration(
 def main():
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.RGB,
-        n_poisons=128,
+        render_mode=WaterworldArguments.RenderMode.HUMAN,
         max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
@@ -66,8 +65,8 @@ def main():
 
     # width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
     # vw = VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")
-    # runner.subscribe_render(lambda x, y: vw.write(y))
-    # runner.subscribe_post_episode(lambda *_: vw.close())
+    # runner.on_render += lambda x, y: vw.write(y)
+    # runner.on_post_episode += lambda *_: vw.close()
 
     # noinspection PyBroadException
     try:

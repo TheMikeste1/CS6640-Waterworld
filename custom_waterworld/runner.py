@@ -5,10 +5,11 @@ from typing import Any, Callable, Dict, TYPE_CHECKING, Union
 
 import pettingzoo as pz
 
+import numpy as np
+
+from custom_waterworld.Event import Event
 
 if TYPE_CHECKING:
-    import numpy as np
-
     from agents import AbstractAgent
 
 
@@ -16,8 +17,9 @@ class Runner:
     __slots__ = (
         "env",
         "agents",
-        "_on_render_callbacks",
-        "_on_post_episode_callbacks",
+        "_on_render_event",
+        "_on_post_episode_event",
+        "_on_finished_iterations_event",
     )
 
     def __init__(
@@ -45,17 +47,37 @@ class Runner:
             )
         self.env = env
         self.agents = agents
-        self._on_render_callbacks = set()
-        self._on_post_episode_callbacks = set()
+        self._on_render_event = Event(
+            callback_type=Callable[[Runner, np.ndarray], None]
+        )
+        self._on_post_episode_event = Event(
+            callback_type=Callable[[Runner, Dict[str, list[float]]], None]
+        )
+        self._on_finished_iterations_event = Event(
+            callback_type=Callable[[Runner], None]
+        )
+
+    @property
+    def on_render(self):
+        return self._on_render_event
+
+    @property
+    def on_post_episode(self):
+        return self._on_post_episode_event
+
+    @property
+    def on_finished_iterations(self):
+        return self._on_finished_iterations_event
 
     def _render(self):
         out = self.env.render()
-        for callback in self._on_render_callbacks:
-            callback(self, out)
+        self._on_render_event(self, out)
 
     def _on_post_episode(self, rewards: Dict[str, list[float]]):
-        for callback in self._on_post_episode_callbacks:
-            callback(self, rewards)
+        self._on_post_episode_event(self, rewards)
+
+    def _on_finished_iterations(self):
+        self._on_finished_iterations_event(self)
 
     def run_episode(self):
         env = self.env
@@ -63,8 +85,8 @@ class Runner:
         rewards = defaultdict(list)
         env.reset()
         num_agents = env.num_agents
+        self._render()
 
-        render_out = env.render()
         for i, agent_name in enumerate(env.agent_iter(), start=1):
             obs, reward, terminated, truncated, info = env.last()
             rewards[agent_name].append(reward)
@@ -80,23 +102,3 @@ class Runner:
     def run_iterations(self, iterations: int):
         for _ in range(iterations):
             rewards = self.run_episode()
-
-    def subscribe_render(
-        self, callback: Callable[[Runner, Union[np.array, None]], None]
-    ):
-        self._on_render_callbacks.add(callback)
-
-    def unsubscribe_render(
-        self, callback: Callable[[Runner, Union[np.array, None]], None]
-    ):
-        self._on_render_callbacks.remove(callback)
-
-    def subscribe_post_episode(
-        self, callback: Callable[[Runner, Dict[str, list[float]]], None]
-    ):
-        self._on_post_episode_callbacks.add(callback)
-
-    def unsubscribe_post_episode(
-        self, callback: Callable[[Runner, Dict[str, list[float]]], None]
-    ):
-        self._on_post_episode_callbacks.remove(callback)

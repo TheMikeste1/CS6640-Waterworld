@@ -9,17 +9,27 @@ import custom_waterworld
 from custom_waterworld import WaterworldArguments
 
 
+class VideoWriter:
+    def __init__(self, fps: int, width: int, height: int, filename: str):
+        self.vw = cv2.VideoWriter(
+            filename, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height), True
+        )
+
+    def write(self, frame):
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        self.vw.write(frame)
+
+    def close(self):
+        self.vw.release()
+
+
 def run_episode_with_video(env: pz.AECEnv, agents, memory):
-    if env.unwrapped.env.render_mode != WaterworldArguments.RenderMode.RGB.value:
-        raise ValueError("Video recording only works with RGB render mode")
 
     rewards = defaultdict(list)
     env.reset()
     out = env.render()
     fps = env.unwrapped.env.FPS
-    vw = cv2.VideoWriter(
-        "output.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, out.shape[:-1], True
-    )
+
     vw.write(out)
     for agent in env.agent_iter():
         obs, reward, terminated, truncated, info = env.last()
@@ -51,17 +61,24 @@ def run_iteration(
 def main():
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.HUMAN,
+        render_mode=WaterworldArguments.RenderMode.RGB,
         n_poisons=128,
         max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
+    env.reset()
+    out = env.render()
+    height = out.shape[0]
+    width = out.shape[1]
+    vw = VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")
     runner = custom_waterworld.Runner(
         env,
         agents={
             "pursuer_0": RandomAgent(env),
             "pursuer_1": RandomAgent(env),
         },
+        on_render=lambda x, y: vw.write(y),
+        on_post_episode=lambda *_: vw.close(),
     )
     print(f"Running at {env.unwrapped.env.FPS} FPS")
 
@@ -78,6 +95,7 @@ def main():
         print("Run interrupted")
     finally:
         env.close()
+        vw.close()
 
 
 if __name__ == "__main__":

@@ -52,17 +52,20 @@ class Runner:
 
         rewards = defaultdict(list)
         env.reset()
+        num_agents = env.num_agents
+
         render_out = env.render()
-        self.on_render(env, render_out)
-        for agent_name in env.agent_iter():
+        self.on_render(self, render_out)
+        for i, agent_name in enumerate(env.agent_iter(), start=1):
             obs, reward, terminated, truncated, info = env.last()
             rewards[agent_name].append(reward)
             agent = self.agents[agent_name]
             action = agent(agent_name, obs)
             action = None if terminated or truncated else action
             env.step(action)
-            render_out = env.render()
-            self.on_render(env, render_out)
+            if i % num_agents == 0:
+                render_out = env.render()
+                self.on_render(self, render_out)
         return rewards
 
     def run_iterations(self, iterations: int):

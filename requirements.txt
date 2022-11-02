@@ -1,3 +1,4 @@
+-r ./agents/requirements.txt
 -r ./custom_waterworld/requirements.txt
 pettingzoo
 scipy~=1.9.3

@@ -1,6 +1,11 @@
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-import pettingzoo as pz
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
+    import pettingzoo as pz
 
 
 class AbstractAgent(ABC):
@@ -10,5 +15,5 @@ class AbstractAgent(ABC):
         self.env = env
 
     @abstractmethod
-    def __call__(self, name, obs):
+    def __call__(self, name, obs) -> np.ndarray:
         pass

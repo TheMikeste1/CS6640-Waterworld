@@ -2,10 +2,12 @@ from collections import defaultdict
 
 import cv2
 import pettingzoo as pz
+import torch.nn
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
 from agents import RandomAgent
 import custom_waterworld
+from agents.nn_agent import NNAgent
 from custom_waterworld import WaterworldArguments
 
 
@@ -48,16 +50,35 @@ def main():
     )
     env = waterworld.env(**args.to_dict())
 
+    num_obs = env.observation_space(env.possible_agents[0]).shape[0]
+
+    class SimpleNN(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layers = torch.nn.ModuleList(
+                [
+                    torch.nn.Linear(num_obs, num_obs**2),
+                    torch.nn.Linear(num_obs**2, 2),
+                ]
+            )
+
+        def forward(self, x):
+            for layer in self.layers:
+                x = layer(x)
+            return x
+
+    # Create agents
+    agent = NNAgent(env, model=SimpleNN(), auto_select_device=False)
+
     runner = custom_waterworld.Runner(
         env,
         agents={
-            "pursuer_0": RandomAgent(env),
-            "pursuer_1": RandomAgent(env),
+            "pursuer_0": agent,
+            "pursuer_1": agent,
         },
     )
     print(f"Running at {env.unwrapped.env.FPS} FPS")
 
-    agents = []
     memory = None
     criterion = None
     lr_scheduler = None

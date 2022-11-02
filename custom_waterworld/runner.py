@@ -19,9 +19,9 @@ class Runner:
         self,
         env: pz.AECEnv,
         agents: Dict[str, AbstractAgent],
-        on_render: Callable[[Runner, Union[np.array | None]], None] = lambda *_: None,
+        on_render: Callable[[Runner, Union[np.array, None]], None] = lambda *_: None,
         on_post_episode: Callable[
-            [pz.utils.BaseWrapper, Dict[str, list[float]]], None
+            [Runner, Dict[str, list[float]]], None
         ] = lambda *_: None,
     ):
         if not isinstance(env, pz.utils.BaseWrapper):

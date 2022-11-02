@@ -66,9 +66,9 @@ class Runner:
             if i % num_agents == 0:
                 render_out = env.render()
                 self.on_render(self, render_out)
+        self.on_post_episode(self, rewards)
         return rewards
 
     def run_iterations(self, iterations: int):
         for _ in range(iterations):
             rewards = self.run_episode()
-            self.on_post_episode(self, rewards)

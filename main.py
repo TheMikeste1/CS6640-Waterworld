@@ -1,12 +1,10 @@
-from collections import defaultdict
-
 import cv2
 import pettingzoo as pz
 import torch.nn
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
 import custom_waterworld
-from agents.nn_agent import NNAgent
+from agents import QNNAgent
 from custom_waterworld import WaterworldArguments
 
 
@@ -44,7 +42,7 @@ def run_iteration(
 def main():
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.RGB,
+        render_mode=WaterworldArguments.RenderMode.HUMAN,
         max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
@@ -52,14 +50,22 @@ def main():
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
 
     class SimpleNN(torch.nn.Module):
-        def __init__(self):
+        def __init__(self, in_features, out_features):
             super().__init__()
             self.layers = torch.nn.ModuleList(
                 [
-                    torch.nn.Linear(num_obs, num_obs**2),
-                    torch.nn.Linear(num_obs**2, 2),
+                    torch.nn.Linear(in_features, in_features**2),
+                    torch.nn.Linear(in_features**2, out_features),
                 ]
             )
+
+        @property
+        def in_features(self):
+            return self.layers[0].in_features
+
+        @property
+        def out_features(self):
+            return self.layers[-1].out_features
 
         def forward(self, x):
             for layer in self.layers:
@@ -67,15 +73,17 @@ def main():
             return x
 
     # Create agents
-    network = SimpleNN()
+    network = SimpleNN(num_obs, 64)
+    policy_networks = [SimpleNN(64, 10) for _ in range(2)]
     optimizer = torch.optim.Adam(network.parameters(), lr=0.001)
     criterion = torch.nn.MSELoss()
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.9)
-    agent = NNAgent(
+    agent = QNNAgent(
         env,
-        model=network,
+        value_model=network,
+        policy_models=policy_networks,
         optimizer=optimizer,
-        loss=criterion,
+        criterion=criterion,
         lr_scheduler=lr_scheduler,
     )
 
@@ -85,6 +93,7 @@ def main():
             "pursuer_0": agent,
             "pursuer_1": agent,
         },
+        should_render_empty=args.render_mode == WaterworldArguments.RenderMode.HUMAN,
     )
     if args.render_mode == WaterworldArguments.RenderMode.HUMAN:
         print(f"Running at {env.unwrapped.env.FPS} FPS")

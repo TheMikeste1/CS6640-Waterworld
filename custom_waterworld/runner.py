@@ -64,6 +64,8 @@ class Runner:
         self.on_finished_iterations(self)
 
     def _on_post_episode(self, rewards: Dict[str, list[float]]):
+        for agent in self.agents.values():
+            agent.post_episode()
         self.on_post_episode(self, rewards)
 
     def _render(self):
@@ -85,6 +87,7 @@ class Runner:
             truncated=truncated,
             info=info,
         )
+        self.agents[agent_name].post_step(step_data)
         self.on_step(self, agent_name, step_data)
 
     def run_episode(self):

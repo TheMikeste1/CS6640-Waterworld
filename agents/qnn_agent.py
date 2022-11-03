@@ -9,8 +9,9 @@ from agents.memory import Memory
 
 if TYPE_CHECKING:
     import pettingzoo as pz
+    from agents.step_data import StepData
 
-# TODO: Refactor to pass in name of agent
+
 class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
         "value_model",
@@ -20,6 +21,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         "lr_schedulers",
         "memory",
         "device",
+        "batch_size",
     )
 
     def __init__(
@@ -33,6 +35,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         lr_schedulers: [torch.optim.lr_scheduler._LRScheduler] = None,
         auto_select_device: bool = True,
         memory: Memory = None,
+        batch_size: int = 1,
     ):
         AbstractAgent.__init__(self, env, name)
         torch.nn.Module.__init__(self)
@@ -63,7 +66,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         self.lr_schedulers = lr_schedulers
 
         self.memory = memory if memory is not None else Memory(1024)
-
+        self.batch_size = batch_size
         self.device = torch.device(
             "cuda" if auto_select_device and torch.cuda.is_available() else "cpu"
         )
@@ -91,6 +94,14 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         value = self.value_model(x)
         actions = {pm: pm(value) for pm in self.policy_models}
         return actions
+
+    def post_episode(self):
+        self.update(self.batch_size)
+
+    def post_step(self, data: StepData):
+        self.memory.add(
+            (data.state, data.action, data.reward, data.next_state, data.terminated)
+        )
 
     def update(self, batch_size: int = 1):
         self.train()

@@ -104,10 +104,10 @@ def main():
     else:
         print(f"Running in the background")
 
-    runner.on_step += lambda r, name, data: agent.memory.add(
-        (data.state, data.action, data.reward, data.next_state, data.terminated)
-    )
-    runner.on_post_episode += lambda *_: agent.update(64)
+    # runner.on_step += lambda r, name, data: agent.memory.add(
+    #     (data.state, data.action, data.reward, data.next_state, data.terminated)
+    # )
+    # runner.on_post_episode += lambda *_: agent.update(64)
 
     # width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
     # vw = VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")

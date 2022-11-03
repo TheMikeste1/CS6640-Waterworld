@@ -1,5 +1,3 @@
-import cv2
-import pettingzoo as pz
 import torch.nn
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
@@ -8,42 +6,11 @@ from agents import NeuralNetwork, QNNAgent
 from custom_waterworld import WaterworldArguments
 
 
-class VideoWriter:
-    def __init__(self, fps: int, width: int, height: int, filename: str):
-        self.vw = cv2.VideoWriter(
-            filename, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height), True
-        )
-
-    def write(self, frame):
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        self.vw.write(frame)
-
-    def close(self):
-        self.vw.release()
-
-
-def run_iteration(
-    env: pz.AECEnv, agents, memory, criterion, lr_scheduler, batch_size: int
-):
-    # Run an epoch
-    # run_episode(env, agents, memory)
-
-    # Perform updates
-    error = {}
-    for agent in agents:
-        loss = 0
-        for _ in range(64):
-            memory_batch = memory.get_batch(batch_size)
-            loss += agent.update(memory_batch)
-        error[agent] = loss / 64
-    lr_scheduler.step()
-
-
 def main():
     args = WaterworldArguments(
         FPS=60,
         render_mode=WaterworldArguments.RenderMode.NONE,
-        max_cycles=64,
+        max_cycles=512,
     )
     env = waterworld.env(**args.to_dict())
 
@@ -97,28 +64,31 @@ def main():
         should_render_empty=args.render_mode == WaterworldArguments.RenderMode.HUMAN,
     )
     if args.render_mode == WaterworldArguments.RenderMode.HUMAN:
-        print(f"Running at {env.unwrapped.env.FPS} FPS")
+        print(f"Running at {env.unwrapped.env.FPS} FPS on {agent.device}")
     else:
-        print(f"Running in the background")
+        print(f"Running in the background on {agent.device}")
 
-    # runner.on_step += lambda r, name, data: agent.memory.add(
-    #     (data.state, data.action, data.reward, data.next_state, data.terminated)
-    # )
-    # runner.on_post_episode += lambda *_: agent.update(64)
-
-    # width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
-    # vw = VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")
-    # runner.on_render += lambda x, y: vw.write(y)
-    # runner.on_post_episode += lambda *_: vw.close()
-
-    # noinspection PyBroadException
     try:
-        runner.run_iterations(8)
+        runner.run_iterations(128)
+    except KeyboardInterrupt:
+        print("Run interrupted")
+        return
+    finally:
+        env.close()
+
+    env.unwrapped.env.render_mode = WaterworldArguments.RenderMode.RGB.value
+
+    width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
+    vw = custom_waterworld.VideoWriter(env.unwrapped.env.FPS, width, height, "test.mp4")
+    runner.on_render += lambda x, y: vw.write(y)
+    runner.on_post_episode += lambda *_: vw.close()
+    try:
+        runner.run_episode()
     except KeyboardInterrupt:
         print("Run interrupted")
     finally:
         env.close()
-        # vw.close()
+        vw.close()
 
 
 if __name__ == "__main__":

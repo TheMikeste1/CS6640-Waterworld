@@ -66,9 +66,11 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         )
         self.to(self.device)
 
-    def __call__(self, obs: np.ndarray) -> np.ndarray:
+    def __call__(self, obs: np.ndarray | torch.Tensor) -> np.ndarray:
         self.eval()
-        obs = torch.from_numpy(obs).to(self.device)
+        if isinstance(obs, np.ndarray):
+            obs = torch.from_numpy(obs)
+        obs = obs.to(self.device).unsqueeze(0)
         policy_outs = torch.nn.Module.__call__(self, obs)
         actions = np.zeros(len(self.policy_models), dtype=np.float32)
         action_space = self.env.action_space(self.name)

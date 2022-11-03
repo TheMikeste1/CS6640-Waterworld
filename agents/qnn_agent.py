@@ -10,15 +10,13 @@ from agents.memory import Memory
 if TYPE_CHECKING:
     import pettingzoo as pz
     from agents.step_data import StepData
+    from agents.neural_network import NeuralNetwork
 
 
 class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
         "value_model",
         "policy_models",
-        "optimizers",
-        "criteria",
-        "lr_schedulers",
         "memory",
         "device",
         "batch_size",
@@ -28,11 +26,8 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         self,
         env: pz.AECEnv,
         name: str,
-        value_model: torch.nn.Module,
-        policy_models: [torch.nn.Module],
-        optimizers: [torch.optim.Optimizer],
-        criteria: [torch.nn.Module],
-        lr_schedulers: [torch.optim.lr_scheduler._LRScheduler] = None,
+        value_model: NeuralNetwork,
+        policy_models: [NeuralNetwork],
         auto_select_device: bool = True,
         memory: Memory = None,
         batch_size: int = 1,
@@ -59,11 +54,6 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
 
         self.value_model = value_model
         self.policy_models = torch.nn.ModuleList(policy_models)
-        self.optimizers = optimizers
-        self.criteria = criteria
-        if lr_schedulers is None:
-            lr_schedulers = [None] * len(optimizers)
-        self.lr_schedulers = lr_schedulers
 
         self.memory = memory if memory is not None else Memory(1024)
         self.batch_size = batch_size
@@ -87,12 +77,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             actions[i] = desired_step * step_size + low
         return actions
 
-    def _call_no_parse(self, obs) -> dict:
-        return torch.nn.Module.__call__(self, obs)
-
     def forward(self, x) -> dict:
         value = self.value_model(x)
-        actions = {pm: pm(value) for pm in self.policy_models}
+        actions = self._call_policies(value)
         return actions
 
     def post_episode(self):
@@ -103,6 +90,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             (data.state, data.action, data.reward, data.next_state, data.terminated)
         )
 
+    def _call_policies(self, value: torch.Tensor) -> dict:
+        return {pm: pm(value) for pm in self.policy_models}
+
     def update(self, batch_size: int = 1):
         self.train()
         state, action, reward, new_state, terminated = self.memory.sample(batch_size)
@@ -111,36 +101,24 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         reward = torch.tensor(reward, device=self.device).unsqueeze(0)
         new_state = torch.tensor(new_state, device=self.device).unsqueeze(0)
 
-        # FIXME: I'm currently crashing, probably because I'm traversing the
-        #  value network twice.
-        #  I likely need to get targets for the value network and the policy networks
-        #  separately.
-        old_targets = self.get_old_targets(state, action)
-        new_targets = self.get_new_targets(reward, new_state)
+        old_value_targets = self.value_model(state)
+        new_value_targets = self.value_model(new_state)
+        self.value_model.step(old_value_targets, new_value_targets)
+
+        value = self.value_model(state).detach()
+        new_value = self.value_model(new_state).detach()
+        old_policy_targets = self.get_old_policy_targets(value, action)
+        new_policy_targets = self.get_new_policy_targets(reward, new_value)
 
         losses = dict()
-        for i, (pm, old_target) in enumerate(old_targets.items()):
-            new_target = new_targets[pm]
-            optimizer = self.optimizers[i]
-            criterion = self.criteria[i]
-            lr_scheduler = self.lr_schedulers[i]
-
-            loss = criterion(old_target, new_target)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            if lr_scheduler is not None:
-                # Don't know why this is giving me unresolved reference;
-                # I've already checked it's not none.
-                # noinspection PyUnresolvedReferences
-                lr_scheduler.step()
-            losses[pm] = loss.item()
-
+        for pm, old_target in old_policy_targets.items():
+            new_target = new_policy_targets[pm]
+            losses[pm] = pm.step(old_target, new_target)
         return losses
 
-    def get_old_targets(self, state, action):
+    def get_old_policy_targets(self, value: torch.Tensor, action):
         # Parse the actions to determine which was taken
-        original_out = self._call_no_parse(state)
+        original_out = self._call_policies(value)
         action_space = self.env.action_space(self.name)
         for i, pm in enumerate(original_out.keys()):
             low = action_space.low[i]
@@ -158,9 +136,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         }
         return old_targets
 
-    def get_new_targets(self, reward, new_state):
+    def get_new_policy_targets(self, reward, new_value: torch.Tensor):
         new_targets = {
             pm: (reward + torch.amax(values, dim=2)).float()
-            for pm, values in self._call_no_parse(new_state).items()
+            for pm, values in self._call_policies(new_value).items()
         }
         return new_targets

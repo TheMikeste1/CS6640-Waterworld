@@ -4,7 +4,7 @@ import torch.nn
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
 import custom_waterworld
-from agents import QNNAgent
+from agents import NeuralNetwork, QNNAgent
 from custom_waterworld import WaterworldArguments
 
 
@@ -49,46 +49,43 @@ def main():
 
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
 
-    class SimpleNN(torch.nn.Module):
-        def __init__(self, in_features, out_features):
-            super().__init__()
-            self.layers = torch.nn.ModuleList(
-                [
-                    torch.nn.Linear(in_features, in_features**2),
-                    torch.nn.Linear(in_features**2, out_features),
-                ]
-            )
-
-        @property
-        def in_features(self):
-            return self.layers[0].in_features
-
-        @property
-        def out_features(self):
-            return self.layers[-1].out_features
-
-        def forward(self, x):
-            for layer in self.layers:
-                x = layer(x)
-            return x
-
     # Create agents
-    network = SimpleNN(num_obs, 64)
-    policy_networks = [SimpleNN(64, 10) for _ in range(2)]
-    optimizers = [torch.optim.Adam(network.parameters(), lr=0.001) for _ in range(2)]
-    lr_schedulers = [
-        torch.optim.lr_scheduler.StepLR(optimizer, 1, 0.99) for optimizer in optimizers
+    network = NeuralNetwork(
+        layers=[
+            torch.nn.Linear(num_obs, num_obs**2),
+            torch.nn.ReLU(),
+            torch.nn.Linear(num_obs**2, 64),
+        ],
+        optimizer_factory=torch.optim.Adam,
+        optimizer_kwargs={"lr": 0.001},
+        criterion_factory=torch.nn.MSELoss,
+        criterion_kwargs={},
+        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
+        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
+    )
+
+    policy_networks = [
+        NeuralNetwork(
+            layers=[
+                torch.nn.Linear(64, 64),
+                torch.nn.ReLU(),
+                torch.nn.Linear(64, 10),
+            ],
+            optimizer_factory=torch.optim.Adam,
+            optimizer_kwargs={"lr": 0.001},
+            criterion_factory=torch.nn.MSELoss,
+            criterion_kwargs={},
+            lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
+            lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
+        )
+        for _ in range(2)
     ]
-    criteria = [torch.nn.MSELoss() for _ in range(2)]
 
     agent = QNNAgent(
         env,
         "pursuer_0",
         value_model=network,
         policy_models=policy_networks,
-        optimizers=optimizers,
-        criteria=criteria,
-        lr_schedulers=lr_schedulers,
     )
 
     runner = custom_waterworld.Runner(

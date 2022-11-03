@@ -75,10 +75,12 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         for i, (pm, values) in enumerate(policy_outs.items()):
             low = action_space.low[i]
             high = action_space.high[i]
-            # pm.out_features - 1 so we can reach the high value
-            step_size = (high - low) / (pm.out_features - 1)
+            # pm.out_features - 1 so we can reach the high value, minus another 1
+            # so feature[0] is 0 (do nothing)
+            step_size = (high - low) / (pm.out_features - 2)
             desired_step = torch.argmax(values)
-            actions[i] = desired_step * step_size + low
+            # If desired_step == 0, keep it that way so we do nothing
+            actions[i] = (desired_step == 0) * (low + step_size * desired_step)
         return actions
 
     def forward(self, x) -> dict:
@@ -127,9 +129,16 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         for i, pm in enumerate(original_out.keys()):
             low = action_space.low[i]
             high = action_space.high[i]
-            # pm.out_features - 1 so we can reach the high value
-            step_size = (high - low) / (pm.out_features - 1)
-            action[..., i] = (action[..., i] - action_space.low[i]) / step_size
+            # pm.out_features - 1 so we can reach the high value,
+            # minus another 1 so feature[0] is 0 (do nothing)
+            step_size = (high - low) / (pm.out_features - 2)
+            action[..., i] = (
+                # If the action is 0, we want to use the first feature,
+                # which is hard-set to be 0 (do nothing)
+                (action[..., i] != 0)
+                * (action[..., i] - action_space.low[i])
+                / step_size
+            )
         # Return the current value for the action taken
         # FIXME: I need to test that action[..., i] is always a whole number
         action = action.long()

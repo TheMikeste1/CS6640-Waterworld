@@ -121,6 +121,7 @@ class Runner:
                 for name, data in cached_data.items():
                     next_state = env.observe(name)
                     self._on_step(agent_name=name, next_state=next_state, **data)
+                cached_data.clear()
 
         self._on_post_episode(rewards)
         return rewards

@@ -42,8 +42,8 @@ def run_iteration(
 def main():
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.HUMAN,
-        max_cycles=512,
+        render_mode=WaterworldArguments.RenderMode.RGB,
+        max_cycles=64,
     )
     env = waterworld.env(**args.to_dict())
 
@@ -75,17 +75,20 @@ def main():
     # Create agents
     network = SimpleNN(num_obs, 64)
     policy_networks = [SimpleNN(64, 10) for _ in range(2)]
-    optimizer = torch.optim.Adam(network.parameters(), lr=0.001)
-    criterion = torch.nn.MSELoss()
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.9)
+    optimizers = [torch.optim.Adam(network.parameters(), lr=0.001) for _ in range(2)]
+    lr_schedulers = [
+        torch.optim.lr_scheduler.StepLR(optimizer, 1, 0.99) for optimizer in optimizers
+    ]
+    criteria = [torch.nn.MSELoss() for _ in range(2)]
+
     agent = QNNAgent(
         env,
         "pursuer_0",
         value_model=network,
         policy_models=policy_networks,
-        optimizer=optimizer,
-        criterion=criterion,
-        lr_scheduler=lr_scheduler,
+        optimizers=optimizers,
+        criteria=criteria,
+        lr_schedulers=lr_schedulers,
     )
 
     runner = custom_waterworld.Runner(

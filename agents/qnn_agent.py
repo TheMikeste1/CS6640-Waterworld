@@ -15,9 +15,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
         "value_model",
         "policy_models",
-        "optimizer",
-        "criterion",
-        "lr_scheduler",
+        "optimizers",
+        "criteria",
+        "lr_schedulers",
         "memory",
         "device",
     )
@@ -28,9 +28,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         name: str,
         value_model: torch.nn.Module,
         policy_models: [torch.nn.Module],
-        optimizer: torch.optim.Optimizer,
-        criterion: torch.nn.Module,
-        lr_scheduler: torch.optim.lr_scheduler._LRScheduler = None,
+        optimizers: [torch.optim.Optimizer],
+        criteria: [torch.nn.Module],
+        lr_schedulers: [torch.optim.lr_scheduler._LRScheduler] = None,
         auto_select_device: bool = True,
         memory: Memory = None,
     ):
@@ -56,9 +56,11 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
 
         self.value_model = value_model
         self.policy_models = torch.nn.ModuleList(policy_models)
-        self.optimizer = optimizer
-        self.criterion = criterion
-        self.lr_scheduler = lr_scheduler
+        self.optimizers = optimizers
+        self.criteria = criteria
+        if lr_schedulers is None:
+            lr_schedulers = [None] * len(optimizers)
+        self.lr_schedulers = lr_schedulers
 
         self.memory = memory if memory is not None else Memory(1024)
 
@@ -70,38 +72,84 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     def __call__(self, obs) -> np.ndarray:
         self.eval()
         obs = torch.tensor(obs, device=self.device)
-        out = torch.nn.Module.__call__(self, obs)
-        return out
-
-    def forward(self, x):
-        value = self.value_model(x)
+        policy_outs = torch.nn.Module.__call__(self, obs)
         actions = np.zeros(len(self.policy_models), dtype=np.float32)
         action_space = self.env.action_space(self.name)
-        for i, policy_model in enumerate(self.policy_models):
+        for i, (pm, values) in enumerate(policy_outs.items()):
             low = action_space.low[i]
             high = action_space.high[i]
-            step_size = (high - low) / policy_model.out_features
-            desired_step = torch.argmax(policy_model(value)).item()
+            # pm.out_features - 1 so we can reach the high value
+            step_size = (high - low) / (pm.out_features - 1)
+            desired_step = torch.argmax(values).item()
             actions[i] = desired_step * step_size + low
         return actions
 
-    def update(self, batch_size: int = 1) -> float:
+    def _call_no_parse(self, obs) -> dict:
+        return torch.nn.Module.__call__(self, obs)
+
+    def forward(self, x) -> dict:
+        value = self.value_model(x)
+        actions = {pm: pm(value) for pm in self.policy_models}
+        return actions
+
+    def update(self, batch_size: int = 1):
         self.train()
         state, action, reward, new_state, terminated = self.memory.sample(batch_size)
         state = torch.tensor(state, device=self.device).unsqueeze(0)
+        action = torch.tensor(action, device=self.device).unsqueeze(0)
         reward = torch.tensor(reward, device=self.device).unsqueeze(0)
         new_state = torch.tensor(new_state, device=self.device).unsqueeze(0)
 
-        # old_targets = self.model(state)
-        # # TODO: Add get_old_targets and get_new_targets to model
-        # new_targets = reward + self.model(new_state)
-        #
-        # loss = self.criterion(old_targets, new_targets)
-        #
-        # self.optimizer.zero_grad()
-        # loss.backward()
-        # self.optimizer.step()
-        # if self.lr_scheduler is not None:
-        #     self.lr_scheduler.step()
-        # return loss.item()
-        return 0
+        # FIXME: I'm currently crashing, probably because I'm traversing the
+        #  value network twice.
+        #  I likely need to get targets for the value network and the policy networks
+        #  separately.
+        old_targets = self.get_old_targets(state, action)
+        new_targets = self.get_new_targets(reward, new_state)
+
+        losses = dict()
+        for i, (pm, old_target) in enumerate(old_targets.items()):
+            new_target = new_targets[pm]
+            optimizer = self.optimizers[i]
+            criterion = self.criteria[i]
+            lr_scheduler = self.lr_schedulers[i]
+
+            loss = criterion(old_target, new_target)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            if lr_scheduler is not None:
+                # Don't know why this is giving me unresolved reference;
+                # I've already checked it's not none.
+                # noinspection PyUnresolvedReferences
+                lr_scheduler.step()
+            losses[pm] = loss.item()
+
+        return losses
+
+    def get_old_targets(self, state, action):
+        # Parse the actions to determine which was taken
+        original_out = self._call_no_parse(state)
+        action_space = self.env.action_space(self.name)
+        for i, pm in enumerate(original_out.keys()):
+            low = action_space.low[i]
+            high = action_space.high[i]
+            # pm.out_features - 1 so we can reach the high value
+            step_size = (high - low) / (pm.out_features - 1)
+            action[..., i] = (action[..., i] - action_space.low[i]) / step_size
+        # Return the current value for the action taken
+        # FIXME: I need to test that action[..., i] is always a whole number
+        action = action.long()
+        old_targets = {
+            # Take the value for the action taken
+            pm: torch.take(values, action[..., i]).float()
+            for i, (pm, values) in enumerate(original_out.items())
+        }
+        return old_targets
+
+    def get_new_targets(self, reward, new_state):
+        new_targets = {
+            pm: (reward + torch.amax(values, dim=2)).float()
+            for pm, values in self._call_no_parse(new_state).items()
+        }
+        return new_targets

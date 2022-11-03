@@ -101,8 +101,8 @@ class Runner:
             rewards[agent_name].append(reward)
             agent = self.agents[agent_name]
             action = agent(obs)
-            action = None if terminated or truncated else action
-            env.step(action)
+            # If the agent is dead or truncated the only allowed action is None
+            env.step(None if terminated or truncated else action)
             # Cache the data for updates later
             cached_data[agent_name] = {
                 "state": obs,

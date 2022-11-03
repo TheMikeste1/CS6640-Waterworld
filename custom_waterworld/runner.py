@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Callable, Dict, TYPE_CHECKING, Union
+from typing import Callable, Dict, TYPE_CHECKING
 
 import pettingzoo as pz
 
 import numpy as np
+from tqdm import tqdm
 
 from agents.step_data import StepData
 from custom_waterworld.event import Event
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from agents import AbstractAgent
 
 
+# TODO: Add a way to run without training
 class Runner:
     __slots__ = (
         "env",
@@ -23,6 +25,7 @@ class Runner:
         "on_render",
         "on_step",
         "should_render_empty",
+        "enable_tqdm",
     )
 
     def __init__(
@@ -30,6 +33,7 @@ class Runner:
         env: pz.AECEnv,
         agents: Dict[str, AbstractAgent],
         should_render_empty: bool = False,
+        enable_tqdm: bool = True,
     ):
         if not isinstance(env, pz.utils.BaseWrapper):
             # Wrap the environment so we can use .unwrap without warnings
@@ -59,6 +63,7 @@ class Runner:
         self.on_step = Event(callback_type=Callable[[Runner, str, StepData], None])
 
         self.should_render_empty = should_render_empty
+        self.enable_tqdm = enable_tqdm
 
     def _on_finished_iterations(self):
         self.on_finished_iterations(self)
@@ -90,7 +95,7 @@ class Runner:
         self.agents[agent_name].post_step(step_data)
         self.on_step(self, agent_name, step_data)
 
-    def run_episode(self):
+    def run_episode(self, train: bool = True):
         env = self.env
 
         rewards = defaultdict(list)
@@ -122,11 +127,15 @@ class Runner:
                     next_state = env.observe(name)
                     self._on_step(agent_name=name, next_state=next_state, **data)
                 cached_data.clear()
-
         self._on_post_episode(rewards)
         return rewards
 
     def run_iterations(self, iterations: int):
-        for _ in range(iterations):
+        rewards = None
+        bar = range(iterations)
+        if self.enable_tqdm:
+            bar = tqdm(bar)
+        for _ in bar:
             rewards = self.run_episode()
+        print(rewards)
         self._on_finished_iterations()

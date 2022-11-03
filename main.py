@@ -1,4 +1,5 @@
 import torch.nn
+import torchinfo
 from pettingzoo.sisl import waterworld_v4 as waterworld
 
 import custom_waterworld
@@ -19,9 +20,13 @@ def main():
     # Create agents
     network = NeuralNetwork(
         layers=[
-            torch.nn.Linear(num_obs, num_obs**2),
+            torch.nn.Linear(num_obs, 16 * num_obs),
             torch.nn.ReLU(),
-            torch.nn.Linear(num_obs**2, 64),
+            torch.nn.Linear(16 * num_obs, 8 * num_obs),
+            torch.nn.ReLU(),
+            torch.nn.Linear(8 * num_obs, 4 * num_obs),
+            torch.nn.ReLU(),
+            torch.nn.Linear(4 * num_obs, 64),
         ],
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 0.001},
@@ -34,7 +39,11 @@ def main():
     policy_networks = [
         NeuralNetwork(
             layers=[
-                torch.nn.Linear(64, 64),
+                torch.nn.Linear(network.out_features, 128),
+                torch.nn.ReLU(),
+                torch.nn.Linear(128, 256),
+                torch.nn.ReLU(),
+                torch.nn.Linear(256, 64),
                 torch.nn.ReLU(),
                 torch.nn.Linear(64, 10),
             ],
@@ -56,6 +65,8 @@ def main():
         batch_size=512,
     )
 
+    torchinfo.summary(agent, input_size=(1, num_obs), device=agent.device, depth=5)
+    
     runner = custom_waterworld.Runner(
         env,
         agents={
@@ -68,7 +79,7 @@ def main():
         print(f"Running at {env.unwrapped.env.FPS} FPS on {agent.device}")
     else:
         print(f"Running in the background on {agent.device}")
-    print("", flush=True)
+    print("", end="", flush=True)
 
     try:
         runner.run_iterations(512)

@@ -12,6 +12,7 @@ class WaterworldArguments:
 
         RGB = "rgb_array"
         HUMAN = "human"
+        NONE = None
 
     n_pursuers: int = 2
     n_evaders: int = 5
@@ -35,7 +36,7 @@ class WaterworldArguments:
     local_ratio: float = 1.0
     speed_features: bool = True
     max_cycles: int = 500
-    render_mode: WaterworldArguments.RenderMode = RenderMode.RGB
+    render_mode: WaterworldArguments.RenderMode = RenderMode.NONE
     FPS: int = 15
 
     """

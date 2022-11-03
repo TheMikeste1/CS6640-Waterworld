@@ -42,7 +42,7 @@ def run_iteration(
 def main():
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.RGB,
+        render_mode=WaterworldArguments.RenderMode.NONE,
         max_cycles=64,
     )
     env = waterworld.env(**args.to_dict())

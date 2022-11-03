@@ -124,6 +124,9 @@ class Runner:
             if i % num_agents == 0:
                 self._render()
                 for name, data in cached_data.items():
+                    # TODO: Might be able to optimize this
+                    #  by updating using the call to env.last().
+                    #  It's currently fairly expensive, so it would be nice to do.
                     next_state = env.observe(name)
                     self._on_step(agent_name=name, next_state=next_state, **data)
                 cached_data.clear()

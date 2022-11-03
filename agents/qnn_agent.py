@@ -77,7 +77,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             high = action_space.high[i]
             # pm.out_features - 1 so we can reach the high value
             step_size = (high - low) / (pm.out_features - 1)
-            desired_step = torch.argmax(values).item()
+            desired_step = torch.argmax(values)
             actions[i] = desired_step * step_size + low
         return actions
 

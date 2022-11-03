@@ -53,6 +53,7 @@ def main():
         "pursuer_0",
         value_model=network,
         policy_models=policy_networks,
+        batch_size=512,
     )
 
     runner = custom_waterworld.Runner(
@@ -67,9 +68,10 @@ def main():
         print(f"Running at {env.unwrapped.env.FPS} FPS on {agent.device}")
     else:
         print(f"Running in the background on {agent.device}")
+    print("", flush=True)
 
     try:
-        runner.run_iterations(128)
+        runner.run_iterations(512)
     except KeyboardInterrupt:
         print("Run interrupted")
         return

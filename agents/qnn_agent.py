@@ -29,7 +29,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         value_model: NeuralNetwork,
         policy_models: [NeuralNetwork],
         auto_select_device: bool = True,
-        memory: Memory = None,
+        memory: Memory | int = None,
         batch_size: int = 1,
     ):
         AbstractAgent.__init__(self, env, name)
@@ -55,7 +55,11 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         self.value_model = value_model
         self.policy_models = torch.nn.ModuleList(policy_models)
 
-        self.memory = memory if memory is not None else Memory(1024)
+        if memory is None:
+            memory = Memory(2048)
+        elif isinstance(memory, int):
+            memory = Memory(memory)
+        self.memory = memory
         self.batch_size = batch_size
         self.device = torch.device(
             "cuda" if auto_select_device and torch.cuda.is_available() else "cpu"

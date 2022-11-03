@@ -66,9 +66,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         )
         self.to(self.device)
 
-    def __call__(self, obs) -> np.ndarray:
+    def __call__(self, obs: np.ndarray) -> np.ndarray:
         self.eval()
-        obs = torch.tensor(obs, device=self.device)
+        obs = torch.from_numpy(obs).to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
         actions = np.zeros(len(self.policy_models), dtype=np.float32)
         action_space = self.env.action_space(self.name)
@@ -102,10 +102,10 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     def update(self, batch_size: int = 1):
         self.train()
         state, action, reward, new_state, terminated = self.memory.sample(batch_size)
-        state = torch.tensor(state, device=self.device).unsqueeze(0)
-        action = torch.tensor(action, device=self.device).unsqueeze(0)
-        reward = torch.tensor(reward, device=self.device).unsqueeze(0)
-        new_state = torch.tensor(new_state, device=self.device).unsqueeze(0)
+        state = torch.from_numpy(state).to(self.device).unsqueeze(0)
+        action = torch.from_numpy(action).to(self.device).unsqueeze(0)
+        reward = torch.from_numpy(reward).to(self.device).unsqueeze(0)
+        new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(0)
 
         old_value_targets = self.value_model(state)
         new_value_targets = self.value_model(new_state)

@@ -8,5 +8,5 @@ if TYPE_CHECKING:
 
 
 class RandomAgent(AbstractAgent):
-    def __call__(self, name, obs) -> np.ndarray:
-        return self.env.action_space(name).sample()
+    def __call__(self, obs) -> np.ndarray:
+        return self.env.action_space(self.name).sample()

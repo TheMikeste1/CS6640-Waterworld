@@ -80,6 +80,7 @@ def main():
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=0.9)
     agent = QNNAgent(
         env,
+        "pursuer_0",
         value_model=network,
         policy_models=policy_networks,
         optimizer=optimizer,

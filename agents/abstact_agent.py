@@ -9,11 +9,12 @@ if TYPE_CHECKING:
 
 
 class AbstractAgent(ABC):
-    __slots__ = ("env",)
+    __slots__ = ("env", "name")
 
-    def __init__(self, env: pz.AECEnv):
+    def __init__(self, env: pz.AECEnv, name: str):
         self.env = env
+        self.name = name
 
     @abstractmethod
-    def __call__(self, name, obs) -> np.ndarray:
+    def __call__(self, obs) -> np.ndarray:
         pass

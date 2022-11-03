@@ -100,7 +100,7 @@ class Runner:
             obs, reward, terminated, truncated, info = env.last()
             rewards[agent_name].append(reward)
             agent = self.agents[agent_name]
-            action = agent(agent_name, obs)
+            action = agent(obs)
             action = None if terminated or truncated else action
             env.step(action)
             # Cache the data for updates later

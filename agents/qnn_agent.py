@@ -25,6 +25,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     def __init__(
         self,
         env: pz.AECEnv,
+        name: str,
         value_model: torch.nn.Module,
         policy_models: [torch.nn.Module],
         optimizer: torch.optim.Optimizer,
@@ -33,7 +34,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         auto_select_device: bool = True,
         memory: Memory = None,
     ):
-        AbstractAgent.__init__(self, env)
+        AbstractAgent.__init__(self, env, name)
         torch.nn.Module.__init__(self)
 
         # Assert the value_model inputs are the same as the observation space
@@ -66,16 +67,16 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         )
         self.to(self.device)
 
-    def __call__(self, name, obs) -> np.ndarray:
+    def __call__(self, obs) -> np.ndarray:
         self.eval()
         obs = torch.tensor(obs, device=self.device)
-        out = torch.nn.Module.__call__(self, obs, name)
+        out = torch.nn.Module.__call__(self, obs)
         return out
 
-    def forward(self, x, name):
+    def forward(self, x):
         value = self.value_model(x)
         actions = np.zeros(len(self.policy_models), dtype=np.float32)
-        action_space = self.env.action_space(name)
+        action_space = self.env.action_space(self.name)
         for i, policy_model in enumerate(self.policy_models):
             low = action_space.low[i]
             high = action_space.high[i]

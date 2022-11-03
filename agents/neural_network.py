@@ -30,7 +30,7 @@ class NeuralNetwork(torch.nn.Module):
                 "lr_scheduler_kwargs cannot be specified without lr_scheduler_factory"
             )
 
-        self.layers = torch.nn.ModuleList(layers)
+        self.layers = torch.nn.Sequential(*layers)
         self.optimizer = optimizer_factory(
             self.parameters(), **(optimizer_kwargs or {})
         )
@@ -50,8 +50,7 @@ class NeuralNetwork(torch.nn.Module):
         return self.layers[-1].out_features
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for layer in self.layers:
-            x = layer(x)
+        x = self.layers(x)
         return x
 
     def step(self, old_target: torch.Tensor, new_target: torch.Tensor):

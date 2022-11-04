@@ -81,8 +81,8 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             # so feature[0] is 0 (do nothing)
             step_size = (high - low) / (pm.out_features - 2)
             desired_step = torch.argmax(values)
-            # If desired_step == 0, keep it that way so we do nothing
-            actions[i] = (desired_step == 0) * (low + step_size * desired_step)
+            # If desired_step == 0, make the agent do nothing
+            actions[i] = (desired_step != 0) * (low + step_size * desired_step)
         return actions
 
     def _call_policies(self, value: torch.Tensor) -> dict:

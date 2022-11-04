@@ -11,7 +11,9 @@ def main():
     args = WaterworldArguments(
         FPS=60,
         render_mode=WaterworldArguments.RenderMode.NONE,
-        max_cycles=512,
+        max_cycles=400,
+        n_evaders=10,
+        n_poisons=20,
     )
     env = waterworld.env(**args.to_dict())
 
@@ -30,7 +32,7 @@ def main():
         ],
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 0.001},
-        criterion_factory=torch.nn.MSELoss,
+        criterion_factory=torch.nn.CrossEntropyLoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
@@ -49,7 +51,7 @@ def main():
             ],
             optimizer_factory=torch.optim.Adam,
             optimizer_kwargs={"lr": 0.001},
-            criterion_factory=torch.nn.MSELoss,
+            criterion_factory=torch.nn.CrossEntropyLoss,
             criterion_kwargs={},
             lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
             lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
@@ -66,7 +68,7 @@ def main():
     )
 
     torchinfo.summary(agent, input_size=(1, num_obs), device=agent.device, depth=5)
-    
+
     runner = custom_waterworld.Runner(
         env,
         agents={

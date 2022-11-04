@@ -85,6 +85,7 @@ def main():
         runner.run_iterations(512)
     except KeyboardInterrupt:
         print("Run interrupted")
+        torch.cuda.empty_cache()
         return
     finally:
         env.close()
@@ -105,6 +106,7 @@ def main():
     finally:
         env.close()
         writer.close()
+        torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":

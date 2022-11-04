@@ -82,7 +82,8 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             step_size = (high - low) / (pm.out_features - 2)
             desired_step = torch.argmax(values)
             # If desired_step == 0, make the agent do nothing
-            actions[i] = (desired_step != 0) * (low + step_size * desired_step)
+            # When desired_step != 0, subtract 1 so we start at the low value
+            actions[i] = (desired_step != 0) * (low + step_size * (desired_step - 1))
         return actions
 
     def _call_policies(self, value: torch.Tensor) -> dict:
@@ -113,9 +114,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             action[..., i] = (
                 # If the action is 0, we want to use the first feature,
                 # which is hard-set to be 0 (do nothing)
+                # When desired_step != 0, add 1 so we get the correct feature
                 (action[..., i] != 0)
-                * (action[..., i] - action_space.low[i])
-                / step_size
+                * ((action[..., i] - action_space.low[i]) / step_size + 1)
             )
         # Return the current value for the action taken
         # FIXME: I need to test that action[..., i] is always a whole number

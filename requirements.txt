@@ -1,5 +1,6 @@
 -r ./agents/requirements.txt
 -r ./custom_waterworld/requirements.txt
+imageio[ffmpeg]
 pettingzoo
 scipy~=1.9.3
 torchinfo~=1.7.1

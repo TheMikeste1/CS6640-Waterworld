@@ -15,11 +15,11 @@ if TYPE_CHECKING:
 
 class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
-        "value_model",
-        "policy_models",
-        "memory",
-        "device",
         "batch_size",
+        "device",
+        "memory",
+        "policy_models",
+        "value_model",
     )
 
     def __init__(

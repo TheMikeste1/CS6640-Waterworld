@@ -2,4 +2,5 @@
 -r ./custom_waterworld/requirements.txt
 pettingzoo
 scipy~=1.9.3
+torchinfo~=1.7.1
 opencv-python==4.5.5.62

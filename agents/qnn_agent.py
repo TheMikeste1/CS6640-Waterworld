@@ -85,44 +85,20 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             actions[i] = (desired_step == 0) * (low + step_size * desired_step)
         return actions
 
+    def _call_policies(self, value: torch.Tensor) -> dict:
+        return {pm: pm(value) for pm in self.policy_models}
+
     def forward(self, x) -> dict:
         value = self.value_model(x)
         actions = self._call_policies(value)
         return actions
 
-    def post_episode(self):
-        self.update(self.batch_size)
-
-    def post_step(self, data: StepData):
-        self.memory.add(
-            (data.state, data.action, data.reward, data.next_state, data.terminated)
-        )
-
-    def _call_policies(self, value: torch.Tensor) -> dict:
-        return {pm: pm(value) for pm in self.policy_models}
-
-    def update(self, batch_size: int = 1):
-        self.train()
-        state, action, reward, new_state, terminated = self.memory.sample(batch_size)
-        state = torch.from_numpy(state).to(self.device).unsqueeze(0)
-        action = torch.from_numpy(action).to(self.device).unsqueeze(0)
-        reward = torch.from_numpy(reward).to(self.device).unsqueeze(0)
-        new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(0)
-
-        old_value_targets = self.value_model(state)
-        new_value_targets = self.value_model(new_state)
-        self.value_model.step(old_value_targets, new_value_targets)
-
-        value = self.value_model(state).detach()
-        new_value = self.value_model(new_state).detach()
-        old_policy_targets = self.get_old_policy_targets(value, action)
-        new_policy_targets = self.get_new_policy_targets(reward, new_value)
-
-        losses = dict()
-        for pm, old_target in old_policy_targets.items():
-            new_target = new_policy_targets[pm]
-            losses[pm] = pm.step(old_target, new_target)
-        return losses
+    def get_new_policy_targets(self, reward, new_value: torch.Tensor):
+        new_targets = {
+            pm: (reward + torch.amax(values, dim=2)).float()
+            for pm, values in self._call_policies(new_value).items()
+        }
+        return new_targets
 
     def get_old_policy_targets(self, value: torch.Tensor, action):
         # Parse the actions to determine which was taken
@@ -151,9 +127,33 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         }
         return old_targets
 
-    def get_new_policy_targets(self, reward, new_value: torch.Tensor):
-        new_targets = {
-            pm: (reward + torch.amax(values, dim=2)).float()
-            for pm, values in self._call_policies(new_value).items()
-        }
-        return new_targets
+    def post_episode(self):
+        self.update(self.batch_size)
+
+    def post_step(self, data: StepData):
+        self.memory.add(
+            (data.state, data.action, data.reward, data.next_state, data.terminated)
+        )
+
+    def update(self, batch_size: int = 1):
+        self.train()
+        state, action, reward, new_state, terminated = self.memory.sample(batch_size)
+        state = torch.from_numpy(state).to(self.device).unsqueeze(0)
+        action = torch.from_numpy(action).to(self.device).unsqueeze(0)
+        reward = torch.from_numpy(reward).to(self.device).unsqueeze(0)
+        new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(0)
+
+        old_value_targets = self.value_model(state)
+        new_value_targets = self.value_model(new_state)
+        self.value_model.step(old_value_targets, new_value_targets)
+
+        value = self.value_model(state).detach()
+        new_value = self.value_model(new_state).detach()
+        old_policy_targets = self.get_old_policy_targets(value, action)
+        new_policy_targets = self.get_new_policy_targets(reward, new_value)
+
+        losses = dict()
+        for pm, old_target in old_policy_targets.items():
+            new_target = new_policy_targets[pm]
+            losses[pm] = pm.step(old_target, new_target)
+        return losses

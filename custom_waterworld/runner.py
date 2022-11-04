@@ -3,9 +3,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Callable, Dict, TYPE_CHECKING
 
-import pettingzoo as pz
-
 import numpy as np
+import pettingzoo as pz
 from tqdm import tqdm
 
 from agents.step_data import StepData

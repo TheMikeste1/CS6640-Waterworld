@@ -10,6 +10,13 @@ if TYPE_CHECKING:
 
 
 class NeuralNetwork(torch.nn.Module):
+    __slots__ = (
+        "criterion",
+        "layers",
+        "lr_scheduler",
+        "optimizer",
+    )
+
     def __init__(
         self,
         layers: [torch.nn.Module],
@@ -41,6 +48,10 @@ class NeuralNetwork(torch.nn.Module):
             else None
         )
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.layers(x)
+        return x
+
     @property
     def in_features(self):
         return self.layers[0].in_features
@@ -48,10 +59,6 @@ class NeuralNetwork(torch.nn.Module):
     @property
     def out_features(self):
         return self.layers[-1].out_features
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.layers(x)
-        return x
 
     def step(self, old_target: torch.Tensor, new_target: torch.Tensor):
         self.optimizer.zero_grad()

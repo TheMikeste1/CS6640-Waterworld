@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 # TODO: Add a way to run without training
 class Runner:
     __slots__ = (
-        "env",
         "agents",
+        "enable_tqdm",
+        "env",
         "on_finished_iterations",
         "on_post_episode",
         "on_render",
         "on_step",
         "should_render_empty",
-        "enable_tqdm",
     )
 
     def __init__(
@@ -73,13 +73,6 @@ class Runner:
             agent.post_episode()
         self.on_post_episode(self, rewards)
 
-    def _render(self):
-        # If no one is listening, don't bother rendering
-        # This should speed things up a bit
-        if self.should_render_empty or len(self.on_render) > 0:
-            out = self.env.render()
-            self.on_render(self, out)
-
     def _on_step(
         self, agent_name, state, next_state, action, reward, terminated, truncated, info
     ):
@@ -94,6 +87,13 @@ class Runner:
         )
         self.agents[agent_name].post_step(step_data)
         self.on_step(self, agent_name, step_data)
+
+    def _render(self):
+        # If no one is listening, don't bother rendering
+        # This should speed things up a bit
+        if self.should_render_empty or len(self.on_render) > 0:
+            out = self.env.render()
+            self.on_render(self, out)
 
     def run_episode(self, train: bool = True):
         env = self.env

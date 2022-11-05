@@ -90,6 +90,8 @@ def main():
         return
     finally:
         env.close()
+        for i, pm in enumerate(policy_networks):
+            torch.save(pm.state_dict(), f"policy_model{i}.pt")
 
     env.unwrapped.env.render_mode = WaterworldArguments.RenderMode.RGB.value
 
@@ -101,7 +103,7 @@ def main():
     runner.on_render += lambda x, y: writer.write(y)
     runner.on_post_episode += lambda *_: writer.close()
     try:
-        runner.run_episode()
+        runner.run_episode(train=False)
     except KeyboardInterrupt:
         print("Run interrupted")
     finally:

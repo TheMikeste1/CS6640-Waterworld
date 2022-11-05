@@ -17,6 +17,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
         "batch_size",
         "device",
+        "epsilon",
         "memory",
         "policy_models",
         "value_model",
@@ -65,6 +66,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             "cuda" if auto_select_device and torch.cuda.is_available() else "cpu"
         )
         self.to(self.device)
+        self.epsilon = 1
 
     def __call__(self, obs: np.ndarray | torch.Tensor) -> (np.ndarray, Any):
         self.eval()
@@ -73,6 +75,10 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         # If obs is not in batch form, add a batch dimension
         if len(obs.shape) < 2:
             obs = obs.unsqueeze(0)
+        if np.random.random() < self.epsilon:
+            actions = self._get_random_actions(num_actions=obs.shape[0]).squeeze()
+            return self._action_to_action_values(actions), actions
+
         obs = obs.to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
 
@@ -103,6 +109,15 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         action_space = self.env.action_space(self.name)
         step_sizes = self._calculate_step_size(action_space)
         return (action_values - action_space.low) / step_sizes
+
+    def _get_random_actions(self, num_actions: int = 1) -> np.ndarray:
+        return np.array(
+            [
+                np.random.randint(0, pm.out_features, size=num_actions)
+                for pm in self.policy_models
+            ],
+            dtype=np.long,
+        ).T
 
     def _calculate_step_size(self, action_space):
         out_features = np.array([pm.out_features for pm in self.policy_models])

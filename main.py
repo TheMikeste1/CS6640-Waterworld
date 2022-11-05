@@ -41,7 +41,7 @@ def main():
     policy_networks = [
         NeuralNetwork(
             layers=[
-                torch.nn.Linear(network.out_features, 128),
+                torch.nn.Linear(num_obs, 128),
                 torch.nn.ReLU(),
                 torch.nn.Linear(128, 256),
                 torch.nn.ReLU(),

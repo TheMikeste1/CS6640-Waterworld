@@ -93,11 +93,11 @@ def main():
 
     env.unwrapped.env.render_mode = WaterworldArguments.RenderMode.RGB.value
 
-    # width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
-    # writer = custom_waterworld.VideoWriter(
-    #     env.unwrapped.env.FPS, width, height, "test.mp4"
-    # )
-    writer = custom_waterworld.GIFWriter(env.unwrapped.env.FPS, "test.gif")
+    width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale
+    writer = custom_waterworld.VideoWriter(
+        env.unwrapped.env.FPS, width, height, "test.mp4"
+    )
+    # writer = custom_waterworld.GIFWriter(env.unwrapped.env.FPS, "test.gif")
     runner.on_render += lambda x, y: writer.write(y)
     runner.on_post_episode += lambda *_: writer.close()
     try:

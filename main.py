@@ -11,7 +11,7 @@ def main():
     args = WaterworldArguments(
         FPS=60,
         render_mode=WaterworldArguments.RenderMode.NONE,
-        max_cycles=400,
+        max_cycles=128,
         n_evaders=10,
         n_poisons=20,
     )
@@ -84,7 +84,7 @@ def main():
     print("", end="", flush=True)
 
     try:
-        runner.run_iterations(512)
+        runner.run_iterations(128)
     except KeyboardInterrupt:
         print("Run interrupted")
         return

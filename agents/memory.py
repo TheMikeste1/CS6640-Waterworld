@@ -37,7 +37,12 @@ class Memory:
 
         :return:
         """
-        choices = random.sample(self.buffer, k=batch_size)
+        # If we have less experiences than the batch size
+        # we'll need to sample with replacement
+        if batch_size <= len(self.buffer):
+            choices = random.sample(self.buffer, k=batch_size)
+        else:
+            choices = random.choices(self.buffer, k=batch_size)
         if zip_by_column:
             choices = zip(*choices)
         return tuple(map(np.array, choices))

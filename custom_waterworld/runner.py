@@ -73,7 +73,16 @@ class Runner:
         self.on_post_episode(self, rewards)
 
     def _on_step(
-        self, agent_name, state, next_state, action, reward, terminated, truncated, info
+        self,
+        agent_name,
+        state,
+        next_state,
+        action,
+        reward,
+        terminated,
+        truncated,
+        info,
+        agent_info,
     ):
         step_data = StepData(
             state=state,
@@ -83,6 +92,7 @@ class Runner:
             terminated=terminated,
             truncated=truncated,
             info=info,
+            agent_info=agent_info,
         )
         self.agents[agent_name].post_step(step_data)
         self.on_step(self, agent_name, step_data)
@@ -107,7 +117,7 @@ class Runner:
             obs, reward, terminated, truncated, info = env.last()
             rewards[agent_name].append(reward)
             agent = self.agents[agent_name]
-            action = agent(obs)
+            action, agent_info = agent(obs)
             # If the agent is dead or truncated the only allowed action is None
             env.step(None if terminated or truncated else action)
             # Cache the data for updates later
@@ -118,6 +128,7 @@ class Runner:
                 "terminated": terminated,
                 "truncated": truncated,
                 "info": info,
+                "agent_info": agent_info,
             }
             # Once all agents have taken a step, we can render and update
             if i % num_agents == 0:

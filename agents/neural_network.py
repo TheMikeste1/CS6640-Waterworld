@@ -61,8 +61,8 @@ class NeuralNetwork(torch.nn.Module):
         return self.layers[-1].out_features
 
     def step(self, old_target: torch.Tensor, new_target: torch.Tensor):
-        self.optimizer.zero_grad()
         loss = self.criterion(old_target, new_target)
+        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         if self.lr_scheduler is not None:

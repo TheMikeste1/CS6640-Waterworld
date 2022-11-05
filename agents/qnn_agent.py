@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import torch
 import numpy as np
@@ -47,10 +47,10 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         ), "There must be a policy_model for each action"
 
         # Assert the policy_models inputs are the same as value_model's output
-        for policy_model in policy_models:
-            assert (
-                policy_model.in_features == value_model.out_features
-            ), "The policy_model input size must match the value_model output size"
+        # for policy_model in policy_models:
+        #     assert (
+        #         policy_model.in_features == value_model.out_features
+        #     ), "The policy_model input size must match the value_model output size"
 
         self.value_model = value_model
         self.policy_models = torch.nn.ModuleList(policy_models)
@@ -66,66 +66,82 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         )
         self.to(self.device)
 
-    def __call__(self, obs: np.ndarray | torch.Tensor) -> np.ndarray:
+    def __call__(self, obs: np.ndarray | torch.Tensor) -> (np.ndarray, Any):
         self.eval()
         if isinstance(obs, np.ndarray):
             obs = torch.from_numpy(obs)
-        obs = obs.to(self.device).unsqueeze(0)
+        # If obs is not in batch form, add a batch dimension
+        if len(obs.shape) < 2:
+            obs = obs.unsqueeze(0)
+        obs = obs.to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
-        actions = np.zeros(len(self.policy_models), dtype=np.float32)
+
+        actions = np.array(
+            [
+                torch.argmax(po, dim=-1)
+                .detach()
+                .cpu()
+                .numpy()
+                .astype(np.long, copy=False)
+                for po in policy_outs
+            ]
+        ).squeeze()
+
+        action_values = self._action_to_action_values(actions)
+        return action_values, actions
+
+    def _action_to_action_values(self, action: [torch.Tensor]) -> torch.Tensor:
         action_space = self.env.action_space(self.name)
-        for i, (pm, values) in enumerate(policy_outs.items()):
-            low = action_space.low[i]
-            high = action_space.high[i]
-            # pm.out_features - 1 so we can reach the high value, minus another 1
-            # so feature[0] is 0 (do nothing)
-            step_size = (high - low) / (pm.out_features - 2)
-            desired_step = torch.argmax(values)
-            # If desired_step == 0, make the agent do nothing
-            # When desired_step != 0, subtract 1 so we start at the low value
-            actions[i] = (desired_step != 0) * (low + step_size * (desired_step - 1))
-        return actions
+        step_sizes = self._calculate_step_size(action_space)
+        return (action * step_sizes + action_space.low).astype(
+            action_space.dtype, copy=False
+        )
 
-    def _call_policies(self, value: torch.Tensor) -> dict:
-        return {pm: pm(value) for pm in self.policy_models}
+    def _action_values_to_action(
+        self, action_values: np.ndarray
+    ) -> np.ndarray[torch.Tensor]:
+        action_space = self.env.action_space(self.name)
+        step_sizes = self._calculate_step_size(action_space)
+        return (action_values - action_space.low) / step_sizes
 
-    def forward(self, x) -> dict:
-        value = self.value_model(x)
-        actions = self._call_policies(value)
+    def _calculate_step_size(self, action_space):
+        out_features = np.array([pm.out_features for pm in self.policy_models])
+        # out_features - 1 because the zeroth feature will give us the low.
+        # For example, if we have 10 out features, the 0th feature will give us the low,
+        # and the 9th feature will give us the high.
+        step_sizes = (action_space.high - action_space.low) / (out_features - 1)
+        return step_sizes
+
+    def _call_policies(self, value: torch.Tensor) -> list[torch.Tensor]:
+        # Concatenates the output of each policy model
+        return [pm(value).squeeze() for pm in self.policy_models]
+
+    def forward(self, x) -> [torch.Tensor]:
+        # value = self.value_model(x)
+        actions = self._call_policies(x)
         return actions
 
     def get_new_policy_targets(self, reward, new_value: torch.Tensor):
-        new_targets = {
-            pm: (reward + torch.amax(values, dim=2)).float()
-            for pm, values in self._call_policies(new_value).items()
-        }
-        return new_targets
+        return [
+            (reward.detach() + torch.amax(v, dim=-1)).squeeze()
+            for v in self._call_policies(new_value)
+        ]
 
     def get_old_policy_targets(self, value: torch.Tensor, action):
         # Parse the actions to determine which was taken
-        original_out = self._call_policies(value)
-        action_space = self.env.action_space(self.name)
-        for i, pm in enumerate(original_out.keys()):
-            low = action_space.low[i]
-            high = action_space.high[i]
-            # pm.out_features - 1 so we can reach the high value,
-            # minus another 1 so feature[0] is 0 (do nothing)
-            step_size = (high - low) / (pm.out_features - 2)
-            action[..., i] = (
-                # If the action is 0, we want to use the first feature,
-                # which is hard-set to be 0 (do nothing)
-                # When desired_step != 0, add 1 so we get the correct feature
-                (action[..., i] != 0)
-                * ((action[..., i] - action_space.low[i]) / step_size + 1)
-            )
-        # Return the current value for the action taken
-        # FIXME: I need to test that action[..., i] is always a whole number
-        action = action.long()
-        old_targets = {
-            # Take the value for the action taken
-            pm: torch.take(values, action[..., i]).float()
-            for i, (pm, values) in enumerate(original_out.items())
-        }
+        old_targets = self._call_policies(value)
+        # From the original_out, gather the output of the policy that was taken.
+
+        # We need to transpose the actions to properly align the dimensions.
+        action = torch.tensor(action.T, device=self.device, dtype=torch.int64)
+        old_targets = [
+            # Given the index of the action,
+            # unsqueeze the action to add the target dimension at the end
+            # then gather the values at those indices.
+            # Finally, squeeze the result to put all the values in the same dimension.
+            o.gather(-1, a.unsqueeze(-1)).squeeze()
+            for o, a in zip(old_targets, action)
+        ]
         return old_targets
 
     def post_episode(self):
@@ -133,28 +149,41 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
 
     def post_step(self, data: StepData):
         self.memory.add(
-            (data.state, data.action, data.reward, data.next_state, data.terminated)
+            (
+                data.state,
+                data.action,
+                data.reward,
+                data.next_state,
+                data.terminated,
+                data.agent_info,
+            )
         )
 
     def update(self, batch_size: int = 1):
         self.train()
-        state, action, reward, new_state, terminated = self.memory.sample(batch_size)
+        state, action, reward, new_state, terminated, action_index = self.memory.sample(
+            batch_size
+        )
         state = torch.from_numpy(state).to(self.device).unsqueeze(0)
-        action = torch.from_numpy(action).to(self.device).unsqueeze(0)
+        # action = torch.from_numpy(action).to(self.device).unsqueeze(0)
         reward = torch.from_numpy(reward).to(self.device).unsqueeze(0)
         new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(0)
 
-        old_value_targets = self.value_model(state)
-        new_value_targets = self.value_model(new_state)
-        self.value_model.step(old_value_targets, new_value_targets)
+        # old_value_targets = self.value_model(state)
+        # new_value_targets = self.value_model(new_state)
+        # self.value_model.step(old_value_targets, new_value_targets)
 
-        value = self.value_model(state).detach()
-        new_value = self.value_model(new_state).detach()
-        old_policy_targets = self.get_old_policy_targets(value, action)
+        # value = self.value_model(state).detach()
+        # new_value = self.value_model(new_state).detach()
+        value = state.detach()
+        new_value = new_state.detach()
+        old_policy_targets = self.get_old_policy_targets(value, action_index)
         new_policy_targets = self.get_new_policy_targets(reward, new_value)
 
-        losses = dict()
-        for pm, old_target in old_policy_targets.items():
-            new_target = new_policy_targets[pm]
-            losses[pm] = pm.step(old_target, new_target)
+        losses = {
+            pm: pm.step(old_target, new_target)
+            for pm, old_target, new_target in zip(
+                self.policy_models, old_policy_targets, new_policy_targets
+            )
+        }
         return losses

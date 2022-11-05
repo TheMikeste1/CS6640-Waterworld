@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -12,3 +13,4 @@ class StepData:
     terminated: bool
     truncated: bool
     info: dict
+    agent_info: Any

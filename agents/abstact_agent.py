@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from agents.step_data import StepData
 
@@ -18,7 +18,7 @@ class AbstractAgent(ABC):
         self.name = name
 
     @abstractmethod
-    def __call__(self, obs) -> np.ndarray:
+    def __call__(self, obs) -> (np.ndarray, Any):
         pass
 
     def post_step(self, data: StepData):

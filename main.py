@@ -48,7 +48,7 @@ def main():
             ],
             optimizer_factory=torch.optim.Adam,
             optimizer_kwargs={"lr": 0.001},
-            criterion_factory=torch.nn.CrossEntropyLoss,
+            criterion_factory=torch.nn.SmoothL1Loss,
             criterion_kwargs={},
             lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
             lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},

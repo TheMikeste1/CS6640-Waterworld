@@ -11,9 +11,9 @@ def main():
     args = WaterworldArguments(
         FPS=60,
         render_mode=WaterworldArguments.RenderMode.NONE,
-        max_cycles=128,
-        n_evaders=10,
-        n_poisons=20,
+        max_cycles=512,
+        n_evaders=20 * 3,
+        n_poisons=20 * 3,
     )
     env = waterworld.env(**args.to_dict())
 
@@ -37,17 +37,14 @@ def main():
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
-
     policy_networks = [
         NeuralNetwork(
             layers=[
-                torch.nn.Linear(num_obs, 128),
-                torch.nn.ReLU(),
-                torch.nn.Linear(128, 256),
+                torch.nn.Linear(num_obs, 256),
                 torch.nn.ReLU(),
                 torch.nn.Linear(256, 64),
                 torch.nn.ReLU(),
-                torch.nn.Linear(64, 10),
+                torch.nn.Linear(64, 3),
             ],
             optimizer_factory=torch.optim.Adam,
             optimizer_kwargs={"lr": 0.001},
@@ -66,9 +63,9 @@ def main():
         policy_models=policy_networks,
         batch_size=512,
     )
-
+    agent.enable_explore = False
     torchinfo.summary(agent, input_size=(1, num_obs), device=agent.device, depth=5)
-
+    agent.enable_explore = True
     runner = custom_waterworld.Runner(
         env,
         agents={
@@ -102,6 +99,8 @@ def main():
     # writer = custom_waterworld.GIFWriter(env.unwrapped.env.FPS, "test.gif")
     runner.on_render += lambda x, y: writer.write(y)
     runner.on_post_episode += lambda *_: writer.close()
+
+    agent.enable_explore = False
     try:
         runner.run_episode(train=False)
     except KeyboardInterrupt:

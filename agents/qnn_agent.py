@@ -17,6 +17,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
         "batch_size",
         "device",
+        "enable_explore",
         "epsilon",
         "memory",
         "policy_models",
@@ -66,19 +67,19 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             "cuda" if auto_select_device and torch.cuda.is_available() else "cpu"
         )
         self.to(self.device)
-        self.epsilon = 1
+        self.epsilon = 0.1
+        self.enable_explore = True
 
     def __call__(self, obs: np.ndarray | torch.Tensor) -> (np.ndarray, Any):
-        self.eval()
         if isinstance(obs, np.ndarray):
             obs = torch.from_numpy(obs)
         # If obs is not in batch form, add a batch dimension
         if len(obs.shape) < 2:
             obs = obs.unsqueeze(0)
-        if np.random.random() < self.epsilon:
+        if self.enable_explore and np.random.random() < self.epsilon:
             actions = self._get_random_actions(num_actions=obs.shape[0]).squeeze()
             return self._action_to_action_values(actions), actions
-
+        self.eval()
         obs = obs.to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
 

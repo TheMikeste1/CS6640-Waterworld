@@ -56,7 +56,7 @@ class Runner:
         self.agents = agents
         self.on_finished_iterations = Event(callback_type=Callable[[Runner], None])
         self.on_post_episode = Event(
-            callback_type=Callable[[Runner, Dict[str, list[float]]], None]
+            callback_type=Callable[[Runner, int, Dict[str, list[float]]], None]
         )
         self.on_render = Event(callback_type=Callable[[Runner, np.ndarray], None])
         self.on_step = Event(callback_type=Callable[[Runner, str, StepData], None])
@@ -67,10 +67,10 @@ class Runner:
     def _on_finished_iterations(self):
         self.on_finished_iterations(self)
 
-    def _on_post_episode(self, rewards: Dict[str, list[float]]):
+    def _on_post_episode(self, iteration: int, rewards: Dict[str, list[float]]):
         for agent in self.agents.values():
             agent.post_episode()
-        self.on_post_episode(self, rewards)
+        self.on_post_episode(self, iteration, rewards)
 
     def _on_step(
         self,
@@ -140,7 +140,6 @@ class Runner:
                     next_state = env.observe(name)
                     self._on_step(agent_name=name, next_state=next_state, **data)
                 cached_data.clear()
-        self._on_post_episode(rewards)
         return rewards
 
     def run_iterations(self, iterations: int):
@@ -148,7 +147,9 @@ class Runner:
         bar = range(iterations)
         if self.enable_tqdm:
             bar = tqdm(bar)
-        for _ in bar:
+        for i in bar:
             rewards = self.run_episode()
+            self._on_post_episode(i, rewards)
+
         print(rewards)
         self._on_finished_iterations()

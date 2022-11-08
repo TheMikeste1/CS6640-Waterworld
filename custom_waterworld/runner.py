@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable, Dict, TYPE_CHECKING
+from typing import Any, Callable, Dict, TYPE_CHECKING
 
 import numpy as np
 import pettingzoo as pz
@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from agents import AbstractAgent
 
 
-# TODO: Add a way to run without training
 class Runner:
     __slots__ = (
         "agents",
@@ -23,7 +22,7 @@ class Runner:
         "on_finished_iterations",
         "on_post_episode",
         "on_render",
-        "on_step",
+        "on_post_step",
         "should_render_empty",
     )
 
@@ -56,10 +55,14 @@ class Runner:
         self.agents = agents
         self.on_finished_iterations = Event(callback_type=Callable[[Runner], None])
         self.on_post_episode = Event(
-            callback_type=Callable[[Runner, int, Dict[str, list[float]]], None]
+            callback_type=Callable[
+                [Runner, int, Dict[str, list[float]], Dict[str, Any]], None
+            ]
         )
         self.on_render = Event(callback_type=Callable[[Runner, np.ndarray], None])
-        self.on_step = Event(callback_type=Callable[[Runner, str, StepData], None])
+        self.on_post_step = Event(
+            callback_type=Callable[[Runner, int, str, StepData], None]
+        )
 
         self.should_render_empty = should_render_empty
         self.enable_tqdm = enable_tqdm
@@ -67,12 +70,21 @@ class Runner:
     def _on_finished_iterations(self):
         self.on_finished_iterations(self)
 
-    def _on_post_episode(self, iteration: int, rewards: Dict[str, list[float]]):
-        for agent in self.agents.values():
-            agent.post_episode()
-        self.on_post_episode(self, iteration, rewards)
+    def _on_post_episode(
+        self, training: bool, iteration: int, rewards: Dict[str, list[float]]
+    ):
+        agent_posts = dict()
+        for agent_name, agent in self.agents.items():
+            agent_posts[agent_name] = agent.post_episode()
 
-    def _on_step(
+        agent_trains = None
+        if training:
+            agent_trains = dict()
+            for agent_name, agent in self.agents.items():
+                agent_trains[agent_name] = agent.on_train()
+        self.on_post_episode(self, iteration, rewards, agent_posts, agent_trains)
+
+    def _post_step(
         self,
         agent_name,
         state,
@@ -95,7 +107,7 @@ class Runner:
             agent_info=agent_info,
         )
         self.agents[agent_name].post_step(step_data)
-        self.on_step(self, agent_name, step_data)
+        self.on_post_step(self, agent_name, step_data)
 
     def _render(self):
         # If no one is listening, don't bother rendering
@@ -120,36 +132,35 @@ class Runner:
             action, agent_info = agent(obs)
             # If the agent is dead or truncated the only allowed action is None
             env.step(None if terminated or truncated else action)
-            # Cache the data for updates later
-            cached_data[agent_name] = {
-                "state": obs,
-                "action": action,
-                "reward": reward,
-                "terminated": terminated,
-                "truncated": truncated,
-                "info": info,
-                "agent_info": agent_info,
-            }
+            if train:
+                # Cache the data for updates later
+                cached_data[agent_name] = {
+                    "state": obs,
+                    "action": action,
+                    "reward": reward,
+                    "terminated": terminated,
+                    "truncated": truncated,
+                    "info": info,
+                    "agent_info": agent_info,
+                }
             # Once all agents have taken a step, we can render and update
             if i % num_agents == 0:
                 self._render()
-                for name, data in cached_data.items():
-                    # TODO: Might be able to optimize this
-                    #  by updating using the call to env.last().
-                    #  It's currently fairly expensive, so it would be nice to do.
-                    next_state = env.observe(name)
-                    self._on_step(agent_name=name, next_state=next_state, **data)
-                cached_data.clear()
+                if train:
+                    for name, data in cached_data.items():
+                        # TODO: Might be able to optimize this
+                        #  by updating using the call to env.last().
+                        #  It's currently fairly expensive, so it would be nice to do.
+                        next_state = env.observe(name)
+                        self._post_step(agent_name=name, next_state=next_state, **data)
+                    cached_data.clear()
         return rewards
 
-    def run_iterations(self, iterations: int):
-        rewards = None
+    def run_iterations(self, iterations: int, train: bool = True):
         bar = range(iterations)
         if self.enable_tqdm:
             bar = tqdm(bar)
         for i in bar:
-            rewards = self.run_episode()
-            self._on_post_episode(i, rewards)
-
-        print(rewards)
+            rewards = self.run_episode(train)
+            self._on_post_episode(train, i, rewards)
         self._on_finished_iterations()

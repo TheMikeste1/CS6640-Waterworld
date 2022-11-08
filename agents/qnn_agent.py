@@ -160,8 +160,8 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         ]
         return old_targets
 
-    def post_episode(self):
-        self.update(self.batch_size)
+    def on_train(self):
+        return self.update(self.batch_size)
 
     def post_step(self, data: StepData):
         self.memory.add(

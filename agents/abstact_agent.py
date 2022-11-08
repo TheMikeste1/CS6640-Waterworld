@@ -26,3 +26,6 @@ class AbstractAgent(ABC):
 
     def post_episode(self):
         pass
+
+    def on_train(self) -> float:
+        return 0.0

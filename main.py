@@ -8,9 +8,13 @@ from agents import NeuralNetwork, QNNAgent
 from custom_waterworld import WaterworldArguments
 
 
-def on_post_episode(writer, runner, it, rewards):
-    for agent, reward in rewards.items():
-        writer.add_scalar(f"{agent}/reward", sum(reward), it)
+def on_post_episode(writer, runner, it, rewards, agent_posts, agent_trains):
+    for agent_name in agent_posts.keys():
+        reward = rewards[agent_name]
+        writer.add_scalar(f"{agent_name}/reward", sum(reward), it)
+        if agent_trains is not None:
+            for i, (pm, loss) in enumerate(agent_trains[agent_name].items()):
+                writer.add_scalar(f"{agent_name}/{i}/loss", loss, it)
 
 
 def main():
@@ -62,35 +66,48 @@ def main():
         for _ in range(2)
     ]
 
-    agent = QNNAgent(
+    pursuer_0 = QNNAgent(
         env,
         "pursuer_0",
         value_model=network,
         policy_models=policy_networks,
         batch_size=512,
     )
-    agent.enable_explore = False
-    torchinfo.summary(agent, input_size=(1, num_obs), device=agent.device, depth=5)
-    agent.enable_explore = True
+    pursuer_0.enable_explore = False
+    torchinfo.summary(
+        pursuer_0, input_size=(1, num_obs), device=pursuer_0.device, depth=5
+    )
+    pursuer_0.enable_explore = True
+
+    pursuer_1 = QNNAgent(
+        env,
+        "pursuer_1",
+        value_model=network,
+        policy_models=policy_networks,
+        batch_size=512,
+    )
+
     runner = custom_waterworld.Runner(
         env,
         agents={
-            "pursuer_0": agent,
-            "pursuer_1": agent,
+            "pursuer_0": pursuer_0,
+            "pursuer_1": pursuer_1,
         },
         should_render_empty=args.render_mode == WaterworldArguments.RenderMode.HUMAN,
     )
 
     tensorboard_writer = SummaryWriter()
 
-    runner.on_post_episode += lambda runner, it, rewards: on_post_episode(
-        tensorboard_writer, runner, it, rewards
+    runner.on_post_episode += (
+        lambda runner, it, rewards, agent_posts, agent_trains: on_post_episode(
+            tensorboard_writer, runner, it, rewards, agent_posts, agent_trains
+        )
     )
 
     if args.render_mode == WaterworldArguments.RenderMode.HUMAN:
-        print(f"Running at {env.unwrapped.env.FPS} FPS on {agent.device}")
+        print(f"Running at {env.unwrapped.env.FPS} FPS on {pursuer_0.device}")
     else:
-        print(f"Running in the background on {agent.device}")
+        print(f"Running in the background on {pursuer_0.device}")
     print("", end="", flush=True)
 
     try:
@@ -101,7 +118,7 @@ def main():
     finally:
         env.close()
         tensorboard_writer.close()
-        torch.save(agent.state_dict(), f"agent.pt")
+        torch.save(pursuer_0.state_dict(), f"agent.pt")
 
     env.unwrapped.env.render_mode = WaterworldArguments.RenderMode.RGB.value
 
@@ -113,7 +130,7 @@ def main():
     runner.on_render += lambda x, y: visual_writer.write(y)
     runner.on_post_episode += lambda *_: visual_writer.close()
 
-    agent.enable_explore = False
+    pursuer_0.enable_explore = False
     try:
         runner.run_episode(train=False)
     except KeyboardInterrupt:

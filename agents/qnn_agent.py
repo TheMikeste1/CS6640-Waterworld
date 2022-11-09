@@ -119,7 +119,7 @@ class QNNAgent(AbstractAgent):
         return action_values, actions
 
     def _action_to_action_values(self, action: [torch.Tensor]) -> torch.Tensor:
-        action_space = self.env.action_space(self.name)
+        action_space = self.env.action_space(self.env_name)
         step_sizes = self._calculate_step_size(action_space)
         return (action * step_sizes + action_space.low).astype(
             action_space.dtype, copy=False
@@ -128,7 +128,7 @@ class QNNAgent(AbstractAgent):
     def _action_values_to_action(
         self, action_values: np.ndarray
     ) -> np.ndarray[torch.Tensor]:
-        action_space = self.env.action_space(self.name)
+        action_space = self.env.action_space(self.env_name)
         step_sizes = self._calculate_step_size(action_space)
         return (action_values - action_space.low) / step_sizes
 

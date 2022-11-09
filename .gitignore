@@ -280,3 +280,5 @@ cython_debug/
 
 .idea/
 /runs/
+/models/interrupted/
+/recordings/

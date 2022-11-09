@@ -8,7 +8,7 @@ from pettingzoo.sisl import waterworld_v4 as waterworld
 from torch.utils.tensorboard import SummaryWriter
 
 import custom_waterworld
-from agents import NeuralNetwork, QNNAgent
+from agents import AbstractAgent, NeuralNetwork, QNNAgent
 from agents.DistanceNeuralNetwork import DistanceNeuralNetwork
 from custom_waterworld import Runner, WaterworldArguments
 
@@ -51,7 +51,7 @@ def record_episode(runner: Runner, record_name: str):
         env.render_mode = previous_mode
 
 
-def train(runner: Runner, iterations: int, name_append: str = ""):
+def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool = True):
     # noinspection PyGlobalUndefined
     global on_post_episode, on_post_train
 
@@ -67,11 +67,12 @@ def train(runner: Runner, iterations: int, name_append: str = ""):
 
     agent = next(iter(runner.agents.values()))
 
-    if env.render_mode == WaterworldArguments.RenderMode.HUMAN.value:
-        print(f"Running at {env.unwrapped.env.FPS} FPS on {agent.device}")
-    else:
-        print(f"Running in the background on {agent.device}")
-    print("", end="", flush=True)
+    if verbose:
+        if env.render_mode == WaterworldArguments.RenderMode.HUMAN.value:
+            print(f"Running at {env.unwrapped.env.FPS} FPS on {agent.device}")
+        else:
+            print(f"Running in the background on {agent.device}")
+        print("", end="", flush=True)
 
     if not os.path.exists("models"):
         os.mkdir("models")
@@ -81,7 +82,8 @@ def train(runner: Runner, iterations: int, name_append: str = ""):
     try:
         runner.run_iterations(iterations)
     except KeyboardInterrupt:
-        print("Run interrupted")
+        if verbose:
+            print("Run interrupted")
         if not os.path.exists("models/interrupted"):
             os.mkdir("models/interrupted")
         for agent in agents:

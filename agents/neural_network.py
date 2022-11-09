@@ -22,16 +22,30 @@ class NeuralNetwork(torch.nn.Module):
     ):
         super().__init__()
         self.layers = torch.nn.Sequential(*layers)
-        self.__num_inputs = (
-            self.layers[0].in_features
-            if hasattr(self.layers[0], "in_features")
-            else self.layers[0].in_channels
-        )
-        self.__num_outputs = (
-            self.layers[-1].out_features
-            if hasattr(self.layers[-1], "out_features")
-            else self.layers[-1].out_channels
-        )
+        self.__num_inputs = 0
+
+        for i in range(0, len(self.layers)):
+            layer = layers[i]
+            if hasattr(layer, "in_features"):
+                self.__num_inputs = layer.in_features
+                break
+            elif hasattr(layer, "in_channels"):
+                self.__num_inputs = layer.in_channels
+                break
+        else:
+            raise ValueError("No layer with in_features or in_channels found")
+
+        self.__num_outputs = 0
+        for i in range(1, len(self.layers) + 1):
+            layer = layers[-i]
+            if hasattr(layer, "out_features"):
+                self.__num_outputs = layer.out_features
+                break
+            elif hasattr(layer, "out_channels"):
+                self.__num_outputs = layer.out_channels
+                break
+        else:
+            raise ValueError("No layer with out_features or out_channels found")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.layers(x)

@@ -76,12 +76,17 @@ def train(runner: Runner, iterations: int, name_append: str = ""):
         print(f"Running in the background on {agent.device}")
     print("", end="", flush=True)
 
+    if not os.path.exists("models"):
+        os.mkdir("models")
+
     agents = set(runner.agents.values())
     # Train
     try:
         runner.run_iterations(iterations)
     except KeyboardInterrupt:
         print("Run interrupted")
+        if not os.path.exists("models/interrupted"):
+            os.mkdir("models/interrupted")
         for agent in agents:
             torch.save(
                 agent.state_dict(), f"models/interrupted/{agent.name}_{name_append}.pt"
@@ -95,7 +100,7 @@ def train(runner: Runner, iterations: int, name_append: str = ""):
 
     for agent in agents:
         torch.save(
-            agent.state_dict(), f"models/{agent.name}_{iterations}_{name_append}.pt"
+            agent.state_dict(), f"models/{agent.name}_{iterations}its_{name_append}.pt"
         )
 
 

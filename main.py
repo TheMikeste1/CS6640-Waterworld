@@ -104,13 +104,14 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
 
 
 def main():
-    ITERATIONS = 64
+    ITERATIONS = 2048
+    BATCH_SIZE = 4096
     args = WaterworldArguments(
         FPS=60,
         render_mode=WaterworldArguments.RenderMode.NONE,
         max_cycles=512,
-        # n_evaders=20 * 3,
-        # n_poisons=20 * 3,
+        n_evaders=5 * 3,
+        n_poisons=10 * 3,
     )
     env = waterworld.env(**args.to_dict())
 
@@ -122,13 +123,14 @@ def main():
         DistanceNeuralNetwork(
             layers=[
                 # out_channels * num_sensors + 2 collision features + 3 speed layers
-                torch.nn.Linear(32 * num_sensors + 2 + num_sensors * 3, 256),
+                torch.nn.Linear(64 * num_sensors + 2 + num_sensors * 3, 256),
                 torch.nn.ReLU(),
                 torch.nn.Linear(256, 256),
                 torch.nn.ReLU(),
                 torch.nn.Linear(256, 3),
             ],
             distance_layers=[
+                torch.nn.BatchNorm1d(5),
                 torch.nn.Conv1d(
                     in_channels=5,
                     out_channels=32,
@@ -138,10 +140,11 @@ def main():
                 torch.nn.ReLU(),
                 torch.nn.Conv1d(
                     in_channels=32,
-                    out_channels=32,
+                    out_channels=64,
                     kernel_size=3,
                     padding=1,
                 ),
+                torch.nn.BatchNorm1d(64),
             ],
             speed_features=True,
             num_sensors=num_sensors,
@@ -154,7 +157,8 @@ def main():
         "pursuer_0",
         name=agent_name,
         policy_models=policy_networks,
-        batch_size=512,
+        batch_size=BATCH_SIZE,
+        memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 0.001},
         criterion_factory=torch.nn.SmoothL1Loss,
@@ -164,11 +168,24 @@ def main():
     )
     pursuer_0.enable_explore = False
     torchinfo.summary(
-        pursuer_0, input_size=(1, num_obs), device=pursuer_0.device, depth=5
+        pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
     )
     pursuer_0.enable_explore = True
 
-    pursuer_1 = pursuer_0
+    pursuer_1 = QNNAgent(
+        env,
+        "pursuer_1",
+        name=agent_name,
+        policy_models=policy_networks,
+        batch_size=4096,
+        memory=8128 * 2,
+        optimizer_factory=torch.optim.Adam,
+        optimizer_kwargs={"lr": 0.001},
+        criterion_factory=torch.nn.SmoothL1Loss,
+        criterion_kwargs={},
+        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
+        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
+    )
 
     runner = Runner(
         env,

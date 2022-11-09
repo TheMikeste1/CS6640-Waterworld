@@ -1,3 +1,5 @@
+from functools import partial
+
 import torch.nn
 import torchinfo
 from pettingzoo.sisl import waterworld_v4 as waterworld
@@ -81,12 +83,8 @@ def main():
     )
 
     tensorboard_writer = SummaryWriter()
-
-    runner.on_post_episode += (
-        lambda runner, it, rewards, agent_posts, agent_trains: on_post_episode(
-            tensorboard_writer, runner, it, rewards, agent_posts, agent_trains
-        )
-    )
+    write_post_episode = partial(on_post_episode, tensorboard_writer)
+    runner.on_post_episode += write_post_episode
 
     if args.render_mode == WaterworldArguments.RenderMode.HUMAN:
         print(f"Running at {env.unwrapped.env.FPS} FPS on {pursuer_0.device}")
@@ -94,6 +92,7 @@ def main():
         print(f"Running in the background on {pursuer_0.device}")
     print("", end="", flush=True)
 
+    # Train
     try:
         runner.run_iterations(128)
     except KeyboardInterrupt:
@@ -104,6 +103,7 @@ def main():
         tensorboard_writer.close()
         torch.save(pursuer_0.state_dict(), f"agent.pt")
 
+    # Run an episode to film
     env.unwrapped.env.render_mode = WaterworldArguments.RenderMode.RGB.value
 
     width, height = env.unwrapped.env.pixel_scale, env.unwrapped.env.pixel_scale

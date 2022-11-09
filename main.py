@@ -10,7 +10,7 @@ from agents import NeuralNetwork, QNNAgent
 from custom_waterworld import WaterworldArguments
 
 
-def on_post_episode(writer, runner, it, rewards, agent_posts, agent_trains):
+def on_post_episode(writer, runner, it, rewards, agent_posts):
     for agent_name in agent_posts.keys():
         reward = rewards[agent_name]
         writer.add_scalar(f"{agent_name}/reward", sum(reward), it)
@@ -44,12 +44,6 @@ def main():
                 torch.nn.ReLU(),
                 torch.nn.Linear(64, 3),
             ],
-            optimizer_factory=torch.optim.Adam,
-            optimizer_kwargs={"lr": 0.001},
-            criterion_factory=torch.nn.SmoothL1Loss,
-            criterion_kwargs={},
-            lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
-            lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
         )
         for _ in range(2)
     ]
@@ -59,6 +53,12 @@ def main():
         "pursuer_0",
         policy_models=policy_networks,
         batch_size=512,
+        optimizer_factory=torch.optim.Adam,
+        optimizer_kwargs={"lr": 0.001},
+        criterion_factory=torch.nn.SmoothL1Loss,
+        criterion_kwargs={},
+        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
+        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
     pursuer_0.enable_explore = False
     torchinfo.summary(
@@ -71,6 +71,12 @@ def main():
         "pursuer_1",
         policy_models=policy_networks,
         batch_size=512,
+        optimizer_factory=torch.optim.Adam,
+        optimizer_kwargs={"lr": 0.001},
+        criterion_factory=torch.nn.SmoothL1Loss,
+        criterion_kwargs={},
+        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
+        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
 
     runner = custom_waterworld.Runner(
@@ -85,6 +91,9 @@ def main():
     tensorboard_writer = SummaryWriter()
     write_post_episode = partial(on_post_episode, tensorboard_writer)
     runner.on_post_episode += write_post_episode
+
+    write_post_train = partial(on_post_train, tensorboard_writer)
+    runner.on_post_train += write_post_train
 
     if args.render_mode == WaterworldArguments.RenderMode.HUMAN:
         print(f"Running at {env.unwrapped.env.FPS} FPS on {pursuer_0.device}")

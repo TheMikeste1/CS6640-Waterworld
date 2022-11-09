@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
+from typing import Any, Callable, Iterable, TYPE_CHECKING, Union
 
 import torch
 import numpy as np
+from torch import Tensor
 
 from agents import AbstractAgent
 from agents.memory import Memory
@@ -12,10 +13,16 @@ if TYPE_CHECKING:
     from agents.step_data import StepData
     from agents.neural_network import NeuralNetwork
 
+    # noinspection PyUnresolvedReferences,PyProtectedMember
+    AbstractLRScheduler = torch.optim.lr_scheduler._LRScheduler
+
 
 class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
         "batch_size",
+        "criterion",
+        "optimizer",
+        "lr_scheduler",
         "device",
         "enable_explore",
         "epsilon",
@@ -28,18 +35,43 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         env: pz.AECEnv,
         name: str,
         policy_models: [NeuralNetwork],
+        optimizer_factory: Callable[[Iterable[Tensor], ...], torch.optim.Optimizer],
+        criterion_factory: Union[
+            Callable[[...], torch.nn.Module], Callable[[...], torch.Tensor]
+        ],
+        lr_scheduler_factory: Callable[
+            [torch.optim.Optimizer, ...], AbstractLRScheduler
+        ] = None,
+        optimizer_kwargs: dict = None,
+        criterion_kwargs: dict = None,
+        lr_scheduler_kwargs: dict = None,
         auto_select_device: bool = True,
         memory: Memory | int = None,
         batch_size: int = 1,
     ):
         AbstractAgent.__init__(self, env, name)
         torch.nn.Module.__init__(self)
+        if lr_scheduler_factory is None and lr_scheduler_kwargs is not None:
+            raise ValueError(
+                "lr_scheduler_kwargs cannot be specified without lr_scheduler_factory"
+            )
+
         # Assert there are the same number of policy_models as actions
         assert (
             len(policy_models) == env.action_space(env.possible_agents[0]).shape[0]
         ), "There must be a policy_model for each action"
 
         self.policy_models = torch.nn.ModuleList(policy_models)
+
+        self.optimizer = optimizer_factory(
+            self.parameters(), **(optimizer_kwargs or {})
+        )
+        self.criterion = criterion_factory(**(criterion_kwargs or {}))
+        self.lr_scheduler = (
+            lr_scheduler_factory(self.optimizer, **(lr_scheduler_kwargs or {}))
+            if lr_scheduler_factory
+            else None
+        )
 
         if memory is None:
             memory = Memory(2048)
@@ -122,10 +154,11 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         return actions
 
     def get_new_policy_targets(self, reward, new_value: torch.Tensor):
-        return [
+        new_targets = [
             (reward.detach() + torch.amax(v, dim=-1)).squeeze()
             for v in self._call_policies(new_value)
         ]
+        return torch.stack(new_targets, dim=-1)
 
     def get_old_policy_targets(self, value: torch.Tensor, action):
         # Parse the actions to determine which was taken
@@ -142,7 +175,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             o.gather(-1, a.unsqueeze(-1)).squeeze()
             for o, a in zip(old_targets, action)
         ]
-        return old_targets
+        return torch.stack(old_targets, dim=-1)
 
     def on_train(self):
         return self.update(self.batch_size)
@@ -173,10 +206,11 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         old_policy_targets = self.get_old_policy_targets(value, action_index)
         new_policy_targets = self.get_new_policy_targets(reward, new_value)
 
-        losses = {
-            pm: pm.step(old_target, new_target)
-            for pm, old_target, new_target in zip(
-                self.policy_models, old_policy_targets, new_policy_targets
-            )
-        }
-        return losses
+        # Calculate loss
+        loss = self.criterion(old_policy_targets, new_policy_targets)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
+        return loss.item()

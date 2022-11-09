@@ -90,7 +90,7 @@ class QNNAgent(AbstractAgent):
         if isinstance(obs, np.ndarray):
             obs = torch.from_numpy(obs)
         # If obs is not in batch form, add a batch dimension
-        if len(obs.shape) < 2:
+        while len(obs.shape) < 3:
             obs = obs.unsqueeze(-2)
         if self.enable_explore and np.random.random() < self.epsilon:
             actions = self._get_random_actions(num_actions=obs.shape[0]).squeeze()
@@ -108,7 +108,7 @@ class QNNAgent(AbstractAgent):
                 .astype(np.long, copy=False)
                 for po in policy_outs
             ]
-        ).squeeze()
+        ).squeeze().T
 
         action_values = self._action_to_action_values(actions)
         return action_values, actions
@@ -203,7 +203,7 @@ class QNNAgent(AbstractAgent):
 
     def update(self, batch_size: int = 1):
         self.train()
-        state, action, reward, new_state, terminated, action_index = self.memory.sample(
+        state, _, reward, new_state, _, action_index = self.memory.sample(
             batch_size
         )
         state = torch.from_numpy(state).to(self.device).unsqueeze(1)

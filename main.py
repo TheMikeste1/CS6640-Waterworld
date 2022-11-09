@@ -1,3 +1,4 @@
+import os.path
 from datetime import datetime
 from functools import partial
 
@@ -26,10 +27,9 @@ def on_post_train(writer: SummaryWriter, runner, it, agent_trains):
     for agent_name in agent_trains.keys():
         loss = agent_trains[agent_name]
         writer.add_scalar(f"{agent_name}/loss", loss, it)
-        model = runner.agents[agent_name]
 
 
-def record_episode(runner: Runner, video_name: str):
+def record_episode(runner: Runner, record_name: str):
     # noinspection PyUnresolvedReferences
     env = runner.env.unwrapped.env
     # Run an episode to film
@@ -37,20 +37,17 @@ def record_episode(runner: Runner, video_name: str):
     env.render_mode = WaterworldArguments.RenderMode.RGB.value
 
     width, height = env.pixel_scale, env.pixel_scale
-    if not video_name.endswith(".mp4"):
-        video_name += ".mp4"
-    visual_writer = custom_waterworld.VideoWriter(env.FPS, width, height, video_name)
-    # visual_writer = custom_waterworld.GIFWriter(env.FPS, "test.gif")
-    runner.on_render += lambda x, y: visual_writer.write(y)
-    runner.on_post_episode += lambda *_: visual_writer.close()
+    visual_writer = custom_waterworld.VideoWriter(env.FPS, width, height, record_name)
+    # visual_writer = custom_waterworld.GIFWriter(env.FPS, "video_name")
 
-    for agent in runner.agents.values():
-        agent.enable_explore = False
+    write_callback = lambda _, frame: visual_writer.write(frame)
+    runner.on_render += write_callback
 
     try:
         runner.run_episode(train=False)
     finally:
         visual_writer.close()
+        runner.on_render -= write_callback
         env.render_mode = previous_mode
 
 
@@ -183,14 +180,18 @@ def main():
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     try:
         train(runner, ITERATIONS, name_append=date_time)
+        pass
     except KeyboardInterrupt:
         print("Run interrupted")
         return
     finally:
         env.close()
 
+    # Record an episode
+    for agent in runner.agents.values():
+        agent.enable_explore = False
     try:
-        record_episode(runner, video_name=f"videos/{agent_name}_{date_time}.mp4")
+        record_episode(runner, record_name=f"recordings/{agent_name}_{date_time}")
     except KeyboardInterrupt:
         print("Run interrupted")
     finally:

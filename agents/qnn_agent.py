@@ -21,14 +21,12 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         "epsilon",
         "memory",
         "policy_models",
-        "value_model",
     )
 
     def __init__(
         self,
         env: pz.AECEnv,
         name: str,
-        value_model: NeuralNetwork,
         policy_models: [NeuralNetwork],
         auto_select_device: bool = True,
         memory: Memory | int = None,
@@ -36,25 +34,11 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     ):
         AbstractAgent.__init__(self, env, name)
         torch.nn.Module.__init__(self)
-
-        # Assert the value_model inputs are the same as the observation space
-        assert (
-            value_model.in_features
-            == env.observation_space(env.possible_agents[0]).shape[0]
-        ), "The value_model input size must match the observation space size"
-
         # Assert there are the same number of policy_models as actions
         assert (
             len(policy_models) == env.action_space(env.possible_agents[0]).shape[0]
         ), "There must be a policy_model for each action"
 
-        # Assert the policy_models inputs are the same as value_model's output
-        # for policy_model in policy_models:
-        #     assert (
-        #         policy_model.in_features == value_model.out_features
-        #     ), "The policy_model input size must match the value_model output size"
-
-        self.value_model = value_model
         self.policy_models = torch.nn.ModuleList(policy_models)
 
         if memory is None:
@@ -181,16 +165,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             batch_size
         )
         state = torch.from_numpy(state).to(self.device).unsqueeze(0)
-        # action = torch.from_numpy(action).to(self.device).unsqueeze(0)
         reward = torch.from_numpy(reward).to(self.device).unsqueeze(0)
         new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(0)
 
-        # old_value_targets = self.value_model(state)
-        # new_value_targets = self.value_model(new_state)
-        # self.value_model.step(old_value_targets, new_value_targets)
-
-        # value = self.value_model(state).detach()
-        # new_value = self.value_model(new_state).detach()
         value = state.detach()
         new_value = new_state.detach()
         old_policy_targets = self.get_old_policy_targets(value, action_index)

@@ -12,9 +12,12 @@ def on_post_episode(writer, runner, it, rewards, agent_posts, agent_trains):
     for agent_name in agent_posts.keys():
         reward = rewards[agent_name]
         writer.add_scalar(f"{agent_name}/reward", sum(reward), it)
-        if agent_trains is not None:
-            for i, (pm, loss) in enumerate(agent_trains[agent_name].items()):
-                writer.add_scalar(f"{agent_name}/{i}/loss", loss, it)
+
+
+def on_post_train(writer, runner, it, agent_trains):
+    for agent_name in agent_trains.keys():
+        loss = agent_trains[agent_name]
+        writer.add_scalar(f"{agent_name}/loss", loss, it)
 
 
 def main():
@@ -30,23 +33,6 @@ def main():
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
 
     # Create agents
-    network = NeuralNetwork(
-        layers=[
-            torch.nn.Linear(num_obs, 16 * num_obs),
-            torch.nn.ReLU(),
-            torch.nn.Linear(16 * num_obs, 8 * num_obs),
-            torch.nn.ReLU(),
-            torch.nn.Linear(8 * num_obs, 4 * num_obs),
-            torch.nn.ReLU(),
-            torch.nn.Linear(4 * num_obs, 64),
-        ],
-        optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.001},
-        criterion_factory=torch.nn.CrossEntropyLoss,
-        criterion_kwargs={},
-        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
-        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
-    )
     policy_networks = [
         NeuralNetwork(
             layers=[
@@ -69,7 +55,6 @@ def main():
     pursuer_0 = QNNAgent(
         env,
         "pursuer_0",
-        value_model=network,
         policy_models=policy_networks,
         batch_size=512,
     )
@@ -82,7 +67,6 @@ def main():
     pursuer_1 = QNNAgent(
         env,
         "pursuer_1",
-        value_model=network,
         policy_models=policy_networks,
         batch_size=512,
     )
@@ -131,6 +115,7 @@ def main():
     runner.on_post_episode += lambda *_: visual_writer.close()
 
     pursuer_0.enable_explore = False
+    pursuer_1.enable_explore = False
     try:
         runner.run_episode(train=False)
     except KeyboardInterrupt:

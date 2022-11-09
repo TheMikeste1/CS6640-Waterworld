@@ -13,6 +13,10 @@ from custom_waterworld.event import Event
 if TYPE_CHECKING:
     from agents import AbstractAgent
 
+REWARDS_TYPE = Dict[str, list[float]]
+POST_EPISODE_TYPE = Dict[str, Any]
+POST_TRAIN_TYPE = Dict[str, float]
+
 
 class Runner:
     __slots__ = (
@@ -21,8 +25,9 @@ class Runner:
         "env",
         "on_finished_iterations",
         "on_post_episode",
-        "on_render",
         "on_post_step",
+        "on_post_train",
+        "on_render",
         "should_render_empty",
     )
 
@@ -56,12 +61,17 @@ class Runner:
         self.on_finished_iterations = Event(callback_type=Callable[[Runner], None])
         self.on_post_episode = Event(
             callback_type=Callable[
-                [Runner, int, Dict[str, list[float]], Dict[str, Any]], None
+                [Runner, int, REWARDS_TYPE, POST_EPISODE_TYPE], None
             ]
         )
         self.on_render = Event(callback_type=Callable[[Runner, np.ndarray], None])
         self.on_post_step = Event(
             callback_type=Callable[[Runner, int, str, StepData], None]
+        )
+        self.on_post_train = Event(
+            callback_type=Callable[
+                [Runner, int, POST_TRAIN_TYPE], None
+            ]
         )
 
         self.should_render_empty = should_render_empty
@@ -70,19 +80,11 @@ class Runner:
     def _on_finished_iterations(self):
         self.on_finished_iterations(self)
 
-    def _on_post_episode(
-        self, training: bool, iteration: int, rewards: Dict[str, list[float]]
-    ):
+    def _on_post_episode(self, iteration: int, rewards: REWARDS_TYPE):
         agent_posts = dict()
         for agent_name, agent in self.agents.items():
             agent_posts[agent_name] = agent.post_episode()
-
-        agent_trains = None
-        if training:
-            agent_trains = dict()
-            for agent_name, agent in self.agents.items():
-                agent_trains[agent_name] = agent.on_train()
-        self.on_post_episode(self, iteration, rewards, agent_posts, agent_trains)
+        self.on_post_episode(self, iteration, rewards, agent_posts)
 
     def _post_step(
         self,
@@ -108,6 +110,12 @@ class Runner:
         )
         self.agents[agent_name].post_step(step_data)
         self.on_post_step(self, agent_name, step_data)
+
+    def _post_train(self, iteration: int):
+        agent_trains = dict()
+        for agent_name, agent in self.agents.items():
+            agent_trains[agent_name] = agent.on_train()
+        self.on_post_train(self, iteration, agent_trains)
 
     def _render(self):
         # If no one is listening, don't bother rendering
@@ -162,5 +170,7 @@ class Runner:
             bar = tqdm(bar)
         for i in bar:
             rewards = self.run_episode(train)
-            self._on_post_episode(train, i, rewards)
+            self._on_post_episode(i, rewards)
+            if train:
+                self._post_train(i)
         self._on_finished_iterations()

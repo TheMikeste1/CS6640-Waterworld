@@ -21,6 +21,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
     __slots__ = (
         "batch_size",
         "criterion",
+        "observation_parser",
         "optimizer",
         "lr_scheduler",
         "device",
@@ -48,6 +49,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         auto_select_device: bool = True,
         memory: Memory | int = None,
         batch_size: int = 1,
+        observation_parser: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
     ):
         AbstractAgent.__init__(self, env, name)
         torch.nn.Module.__init__(self)
@@ -73,6 +75,8 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             else None
         )
 
+        self.observation_parser = observation_parser
+
         if memory is None:
             memory = Memory(2048)
         elif isinstance(memory, int):
@@ -97,6 +101,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             return self._action_to_action_values(actions), actions
         self.eval()
         obs = obs.to(self.device)
+        obs = self.observation_parser(obs)
         policy_outs = torch.nn.Module.__call__(self, obs)
 
         actions = np.array(

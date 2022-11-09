@@ -34,7 +34,7 @@ class QNNAgent(AbstractAgent):
     def __init__(
         self,
         env: pz.AECEnv,
-        name: str,
+        env_name: str,
         policy_models: [NeuralNetwork],
         optimizer_factory: Callable[[Iterable[Tensor], ...], torch.optim.Optimizer],
         criterion_factory: Union[
@@ -50,8 +50,9 @@ class QNNAgent(AbstractAgent):
         memory: Memory | int = None,
         batch_size: int = 1,
         observation_parser: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
+        name: str = "",
     ):
-        AbstractAgent.__init__(self, env, name)
+        AbstractAgent.__init__(self, env, env_name, name=name)
         if lr_scheduler_factory is None and lr_scheduler_kwargs is not None:
             raise ValueError(
                 "lr_scheduler_kwargs cannot be specified without lr_scheduler_factory"
@@ -182,8 +183,16 @@ class QNNAgent(AbstractAgent):
         ]
         return torch.stack(old_targets, dim=-1)
 
+    @property
+    def in_features(self):
+        return self.policy_models[0].in_features
+
     def on_train(self):
         return self.update(self.batch_size)
+
+    @property
+    def out_features(self):
+        return self.policy_models[0].out_features
 
     def post_step(self, data: StepData):
         self.memory.add(

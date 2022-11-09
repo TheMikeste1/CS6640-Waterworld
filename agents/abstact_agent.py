@@ -13,11 +13,12 @@ if TYPE_CHECKING:
 
 
 class AbstractAgent(ABC, torch.nn.Module):
-    __slots__ = ("env", "name")
+    __slots__ = ("env", "env_name", "name")
 
-    def __init__(self, env: pz.AECEnv, name: str):
+    def __init__(self, env: pz.AECEnv, env_name: str, name: str):
         torch.nn.Module.__init__(self)
         self.env = env
+        self.env_name = env_name
         self.name = name
 
     @abstractmethod

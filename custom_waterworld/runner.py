@@ -60,18 +60,14 @@ class Runner:
         self.agents = agents
         self.on_finished_iterations = Event(callback_type=Callable[[Runner], None])
         self.on_post_episode = Event(
-            callback_type=Callable[
-                [Runner, int, REWARDS_TYPE, POST_EPISODE_TYPE], None
-            ]
+            callback_type=Callable[[Runner, int, REWARDS_TYPE, POST_EPISODE_TYPE], None]
         )
         self.on_render = Event(callback_type=Callable[[Runner, np.ndarray], None])
         self.on_post_step = Event(
             callback_type=Callable[[Runner, int, str, StepData], None]
         )
         self.on_post_train = Event(
-            callback_type=Callable[
-                [Runner, int, POST_TRAIN_TYPE], None
-            ]
+            callback_type=Callable[[Runner, int, POST_TRAIN_TYPE], None]
         )
 
         self.should_render_empty = should_render_empty
@@ -88,6 +84,7 @@ class Runner:
 
     def _post_step(
         self,
+        training: bool,
         agent_name,
         state,
         next_state,
@@ -108,7 +105,8 @@ class Runner:
             info=info,
             agent_info=agent_info,
         )
-        self.agents[agent_name].post_step(step_data)
+        if training:
+            self.agents[agent_name].post_step(step_data)
         self.on_post_step(self, agent_name, step_data)
 
     def _post_train(self, iteration: int):
@@ -140,28 +138,28 @@ class Runner:
             action, agent_info = agent(obs)
             # If the agent is dead or truncated the only allowed action is None
             env.step(None if terminated or truncated else action)
-            if train:
-                # Cache the data for updates later
-                cached_data[agent_name] = {
-                    "state": obs,
-                    "action": action,
-                    "reward": reward,
-                    "terminated": terminated,
-                    "truncated": truncated,
-                    "info": info,
-                    "agent_info": agent_info,
-                }
+            # Cache the data for updates later
+            cached_data[agent_name] = {
+                "state": obs,
+                "action": action,
+                "reward": reward,
+                "terminated": terminated,
+                "truncated": truncated,
+                "info": info,
+                "agent_info": agent_info,
+            }
             # Once all agents have taken a step, we can render and update
             if i % num_agents == 0:
                 self._render()
-                if train:
-                    for name, data in cached_data.items():
-                        # TODO: Might be able to optimize this
-                        #  by updating using the call to env.last().
-                        #  It's currently fairly expensive, so it would be nice to do.
-                        next_state = env.observe(name)
-                        self._post_step(agent_name=name, next_state=next_state, **data)
-                    cached_data.clear()
+                for name, data in cached_data.items():
+                    # TODO: Might be able to optimize this
+                    #  by updating using the call to env.last().
+                    #  It's currently fairly expensive, so it would be nice to do.
+                    next_state = env.observe(name)
+                    self._post_step(
+                        training=train, agent_name=name, next_state=next_state, **data
+                    )
+                cached_data.clear()
         return rewards
 
     def run_iterations(self, iterations: int, train: bool = True):

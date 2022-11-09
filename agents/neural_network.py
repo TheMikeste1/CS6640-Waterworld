@@ -22,6 +22,16 @@ class NeuralNetwork(torch.nn.Module):
     ):
         super().__init__()
         self.layers = torch.nn.Sequential(*layers)
+        self.__num_inputs = (
+            self.layers[0].in_features
+            if hasattr(self.layers[0], "in_features")
+            else self.layers[0].in_channels
+        )
+        self.__num_outputs = (
+            self.layers[-1].out_features
+            if hasattr(self.layers[-1], "out_features")
+            else self.layers[-1].out_channels
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.layers(x)
@@ -29,8 +39,8 @@ class NeuralNetwork(torch.nn.Module):
 
     @property
     def in_features(self) -> int:
-        return self.layers[0].in_features
+        return self.__num_inputs
 
     @property
     def out_features(self) -> int:
-        return self.layers[-1].out_features
+        return self.__num_outputs

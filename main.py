@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import partial
 
 import torch.nn
@@ -35,6 +36,7 @@ def main():
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
 
     # Create agents
+    agent_name = "qnn_simple_linear_256_64_3"
     policy_networks = [
         NeuralNetwork(
             layers=[
@@ -101,6 +103,7 @@ def main():
         print(f"Running in the background on {pursuer_0.device}")
     print("", end="", flush=True)
 
+    date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # Train
     try:
         runner.run_iterations(128)
@@ -110,7 +113,7 @@ def main():
     finally:
         env.close()
         tensorboard_writer.close()
-        torch.save(pursuer_0.state_dict(), f"agent.pt")
+        torch.save(pursuer_0.state_dict(), f"{agent_name}_{date_time}.pt")
 
     # Run an episode to film
     env.unwrapped.env.render_mode = WaterworldArguments.RenderMode.RGB.value

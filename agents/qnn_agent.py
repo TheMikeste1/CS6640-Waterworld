@@ -95,7 +95,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             obs = torch.from_numpy(obs)
         # If obs is not in batch form, add a batch dimension
         if len(obs.shape) < 2:
-            obs = obs.unsqueeze(0)
+            obs = obs.unsqueeze(-2)
         if self.enable_explore and np.random.random() < self.epsilon:
             actions = self._get_random_actions(num_actions=obs.shape[0]).squeeze()
             return self._action_to_action_values(actions), actions
@@ -159,10 +159,11 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         return actions
 
     def get_new_policy_targets(self, reward, new_value: torch.Tensor):
-        new_targets = [
-            (reward.detach() + torch.amax(v, dim=-1)).squeeze()
-            for v in self._call_policies(new_value)
-        ]
+        new_targets = []
+        reward = reward.detach()
+        for v in self._call_policies(new_value):
+            new_targets.append(reward + torch.amax(v, dim=-1, keepdim=True))
+
         return torch.stack(new_targets, dim=-1)
 
     def get_old_policy_targets(self, value: torch.Tensor, action):
@@ -177,7 +178,7 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
             # unsqueeze the action to add the target dimension at the end
             # then gather the values at those indices.
             # Finally, squeeze the result to put all the values in the same dimension.
-            o.gather(-1, a.unsqueeze(-1)).squeeze()
+            o.gather(-1, a.unsqueeze(-1))
             for o, a in zip(old_targets, action)
         ]
         return torch.stack(old_targets, dim=-1)
@@ -202,9 +203,9 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         state, action, reward, new_state, terminated, action_index = self.memory.sample(
             batch_size
         )
-        state = torch.from_numpy(state).to(self.device).unsqueeze(0)
-        reward = torch.from_numpy(reward).to(self.device).unsqueeze(0)
-        new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(0)
+        state = torch.from_numpy(state).to(self.device).unsqueeze(1)
+        reward = torch.from_numpy(reward).to(self.device).unsqueeze(1)
+        new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(1)
 
         value = state.detach()
         new_value = new_state.detach()

@@ -1,5 +1,5 @@
 box2d-py
-imageio~=2.22.3
+imageio~=2.22.4
 numpy
 pettingzoo[sisl]~=1.22.1
 pymunk

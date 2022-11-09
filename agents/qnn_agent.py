@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     AbstractLRScheduler = torch.optim.lr_scheduler._LRScheduler
 
 
-class QNNAgent(AbstractAgent, torch.nn.Module):
+class QNNAgent(AbstractAgent):
     __slots__ = (
         "batch_size",
         "criterion",
@@ -52,7 +52,6 @@ class QNNAgent(AbstractAgent, torch.nn.Module):
         observation_parser: Callable[[torch.Tensor], torch.Tensor] = lambda x: x,
     ):
         AbstractAgent.__init__(self, env, name)
-        torch.nn.Module.__init__(self)
         if lr_scheduler_factory is None and lr_scheduler_kwargs is not None:
             raise ValueError(
                 "lr_scheduler_kwargs cannot be specified without lr_scheduler_factory"

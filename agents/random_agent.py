@@ -9,12 +9,12 @@ if TYPE_CHECKING:
 
 class RandomAgent(AbstractAgent):
     def __call__(self, obs) -> (np.ndarray, Any):
-        return self.env.action_space(self.name).sample(), None
+        return self.env.action_space(self.env_name).sample(), None
 
     @property
     def in_features(self):
-        return self.env.observation_spaces[self.name].shape[0]
+        return self.env.observation_spaces[self.env_name].shape[0]
 
     @property
     def out_features(self):
-        return self.env.action_space(self.name).n
+        return self.env.action_space(self.env_name).n

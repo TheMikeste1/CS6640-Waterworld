@@ -137,7 +137,6 @@ class Runner:
             agent = self.agents[agent_name]
             action, agent_info = agent(obs)
             action = action.squeeze()
-            agent_info = agent_info.squeeze()
 
             # If the agent is dead or truncated the only allowed action is None
             env.step(None if terminated or truncated else action)

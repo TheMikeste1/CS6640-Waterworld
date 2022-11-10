@@ -112,7 +112,7 @@ class QNNAgent(AbstractAgent):
         )
 
         action_values = self._action_to_action_values(actions)
-        return action_values, actions
+        return action_values, actions.squeeze()
 
     def _action_to_action_values(self, action: [torch.Tensor]) -> torch.Tensor:
         action_space = self.env.action_space(self.env_name)

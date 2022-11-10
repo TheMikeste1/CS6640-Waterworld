@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import custom_waterworld
 from agents import AbstractAgent, NeuralNetwork, QNNAgent
 from agents.DistanceNeuralNetwork import DistanceNeuralNetwork
+from agents.human_agent import HumanAgent
 from custom_waterworld import Runner, WaterworldArguments
 
 
@@ -61,7 +62,7 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
     tensorboard_writer = SummaryWriter(
         log_dir=f"runs/{agent.name}_{iterations}its_{name_append}"
     )
-    
+
     write_post_episode = partial(on_post_episode, tensorboard_writer)
     runner.on_post_episode += write_post_episode
 
@@ -70,7 +71,7 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
 
     if verbose:
         if env.render_mode == WaterworldArguments.RenderMode.HUMAN.value:
-            print(f"Running at {env.unwrapped.env.FPS} FPS on {agent.device}")
+            print(f"Running at {env.FPS} FPS")
         else:
             print(f"Running in the background on {agent.device}")
         print("", end="", flush=True)
@@ -131,11 +132,11 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 12_288
+    ITERATIONS = 1
     BATCH_SIZE = 4096
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.NONE,
+        render_mode=WaterworldArguments.RenderMode.HUMAN,
         max_cycles=512,
         n_evaders=5 * 3,
         n_poisons=10 * 3,
@@ -145,7 +146,7 @@ def main():
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
     num_sensors = args.n_sensors
     # Create agents
-    agent_name = "qnn_distance"
+    agent_name = "human"
     policy_networks = [
         DistanceNeuralNetwork(
             layers=[
@@ -201,51 +202,10 @@ def main():
     )
     pursuer_0.enable_explore = True
 
-    policy_networks = [
-        DistanceNeuralNetwork(
-            layers=[
-                # out_channels * num_sensors + 2 collision features + 3 speed layers
-                torch.nn.Linear(64 * num_sensors + 2 + num_sensors * 3, 256),
-                torch.nn.ReLU(),
-                torch.nn.Linear(256, 256),
-                torch.nn.ReLU(),
-                torch.nn.Linear(256, 3),
-            ],
-            distance_layers=[
-                torch.nn.BatchNorm1d(5),
-                torch.nn.Conv1d(
-                    in_channels=5,
-                    out_channels=32,
-                    kernel_size=3,
-                    padding=1,
-                ),
-                torch.nn.ReLU(),
-                torch.nn.Conv1d(
-                    in_channels=32,
-                    out_channels=64,
-                    kernel_size=3,
-                    padding=1,
-                ),
-                torch.nn.BatchNorm1d(64),
-            ],
-            speed_features=True,
-            num_sensors=num_sensors,
-        )
-        for _ in range(2)
-    ]
-    pursuer_1 = QNNAgent(
+    pursuer_1 = HumanAgent(
         env,
         "pursuer_1",
         name=agent_name,
-        policy_models=policy_networks,
-        batch_size=4096,
-        memory=8128 * 2,
-        optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.001},
-        criterion_factory=torch.nn.MSELoss,
-        criterion_kwargs={},
-        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
-        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
 
     runner = Runner(

@@ -133,11 +133,12 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 1
+    ITERATIONS = 512
     BATCH_SIZE = 4096
+    agent_name = "qnn_distance"
     args = WaterworldArguments(
         FPS=60,
-        render_mode=WaterworldArguments.RenderMode.HUMAN,
+        render_mode=WaterworldArguments.RenderMode.NONE,
         max_cycles=512,
         n_evaders=5 * 3,
         n_poisons=10 * 3,
@@ -147,7 +148,6 @@ def main():
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
     num_sensors = args.n_sensors
     # Create agents
-    agent_name = "human"
     policy_networks = [
         DistanceNeuralNetwork(
             layers=[
@@ -203,10 +203,19 @@ def main():
     )
     pursuer_0.enable_explore = True
 
-    pursuer_1 = HumanAgent(
+    pursuer_1 = QNNAgent(
         env,
         "pursuer_1",
         name=agent_name,
+        policy_models=policy_networks,
+        batch_size=BATCH_SIZE,
+        memory=BATCH_SIZE * 2,
+        optimizer_factory=torch.optim.Adam,
+        optimizer_kwargs={"lr": 0.001},
+        criterion_factory=torch.nn.MSELoss,
+        criterion_kwargs={},
+        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
+        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
 
     runner = Runner(

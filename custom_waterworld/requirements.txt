@@ -1,6 +1,9 @@
 box2d-py
 imageio~=2.22.4
 numpy
-pettingzoo[sisl]~=1.22.1
+# This is my fixed version of PettingZoo, which fixes some bugs present in waterworld
+# I've submitted a pull request, so hopefully they will be fixed soon and we can use
+# the official version
+pettingzoo[sisl] @ git+https://github.com/TheMikeste1/PettingZoo.git@master
 pymunk
 swig

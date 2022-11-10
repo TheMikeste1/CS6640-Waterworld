@@ -55,14 +55,18 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
     # noinspection PyUnresolvedReferences
     env = runner.env.unwrapped.env
 
-    tensorboard_writer = SummaryWriter()
+    agents = set(runner.agents.values())
+    agent = next(iter(agents))
+
+    tensorboard_writer = SummaryWriter(
+        log_dir=f"runs/{agent.name}_{iterations}its_{name_append}"
+    )
+    
     write_post_episode = partial(on_post_episode, tensorboard_writer)
     runner.on_post_episode += write_post_episode
 
     write_post_train = partial(on_post_train, tensorboard_writer)
     runner.on_post_train += write_post_train
-
-    agent = next(iter(runner.agents.values()))
 
     if verbose:
         if env.render_mode == WaterworldArguments.RenderMode.HUMAN.value:
@@ -74,7 +78,6 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
     if not os.path.exists("models"):
         os.mkdir("models")
 
-    agents = set(runner.agents.values())
     # Train
     try:
         runner.run_iterations(iterations)
@@ -85,7 +88,8 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
             os.mkdir("models/interrupted")
         for agent in agents:
             torch.save(
-                agent.state_dict(), f"models/interrupted/{agent.name}_{name_append}.pt"
+                agent.state_dict(),
+                f"models/interrupted/{agent.name}_{agent.env_name}_{name_append}.pt",
             )
         return
     finally:
@@ -127,7 +131,7 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 1024
+    ITERATIONS = 12_288
     BATCH_SIZE = 4096
     args = WaterworldArguments(
         FPS=60,
@@ -197,6 +201,38 @@ def main():
     )
     pursuer_0.enable_explore = True
 
+    policy_networks = [
+        DistanceNeuralNetwork(
+            layers=[
+                # out_channels * num_sensors + 2 collision features + 3 speed layers
+                torch.nn.Linear(64 * num_sensors + 2 + num_sensors * 3, 256),
+                torch.nn.ReLU(),
+                torch.nn.Linear(256, 256),
+                torch.nn.ReLU(),
+                torch.nn.Linear(256, 3),
+            ],
+            distance_layers=[
+                torch.nn.BatchNorm1d(5),
+                torch.nn.Conv1d(
+                    in_channels=5,
+                    out_channels=32,
+                    kernel_size=3,
+                    padding=1,
+                ),
+                torch.nn.ReLU(),
+                torch.nn.Conv1d(
+                    in_channels=32,
+                    out_channels=64,
+                    kernel_size=3,
+                    padding=1,
+                ),
+                torch.nn.BatchNorm1d(64),
+            ],
+            speed_features=True,
+            num_sensors=num_sensors,
+        )
+        for _ in range(2)
+    ]
     pursuer_1 = QNNAgent(
         env,
         "pursuer_1",
@@ -229,7 +265,10 @@ def main():
         # Record an episode
         for agent in runner.agents.values():
             agent.enable_explore = False
-        record_episode(runner, record_name=f"recordings/{agent_name}_{date_time}")
+        record_episode(
+            runner,
+            record_name=f"recordings/{agent_name}_{ITERATIONS}its_{date_time}",
+        )
     except KeyboardInterrupt:
         print("Run interrupted")
         return

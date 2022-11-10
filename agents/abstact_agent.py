@@ -20,6 +20,7 @@ class AbstractAgent(ABC, torch.nn.Module):
         self.env = env
         self.env_name = env_name
         self.name = name
+        self.device = torch.device("cpu")
 
     @abstractmethod
     def __call__(self, obs) -> (np.ndarray, Any):
@@ -47,3 +48,7 @@ class AbstractAgent(ABC, torch.nn.Module):
 
     def apply_loss(self, old_policy_targets, new_policy_targets):
         pass
+
+    def to(self, *args, **kwargs):
+        self.device = args[0]
+        return super().to(*args, **kwargs)

@@ -33,3 +33,17 @@ class AbstractAgent(ABC, torch.nn.Module):
 
     def on_train(self) -> float:
         return 0.0
+
+    @property
+    def in_features(self):
+        raise NotImplementedError
+
+    @property
+    def out_features(self):
+        raise NotImplementedError
+
+    def update(self, batch_size: int):
+        pass
+
+    def apply_loss(self, old_policy_targets, new_policy_targets):
+        pass

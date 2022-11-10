@@ -100,8 +100,34 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
         )
 
 
+def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: int):
+    device = agent.device
+    for _ in range(iterations):
+        test_input = torch.rand(
+            size=(batch_size, agent.in_features), dtype=torch.float
+        ).to(device)
+        _, test_output = agent(test_input)
+        test_output = torch.from_numpy(test_output).to(device).float()
+
+        # policy to always take a specified action
+        y = torch.ones(
+            size=(batch_size, agent.env.action_space(agent.env_name).shape[0]),
+            dtype=test_output.dtype,
+        ).to(device)
+        assert test_output.shape == y.shape
+
+        # Choose a power we want to learn
+        y *= 3
+
+        # Calculate the loss
+        agent.apply_loss(test_output, y)
+    test_input = torch.rand(size=(1, agent.in_features), dtype=torch.float).to(device)
+    out = agent(test_input)
+    print(out)
+
+
 def main():
-    ITERATIONS = 2048
+    ITERATIONS = 1024
     BATCH_SIZE = 4096
     args = WaterworldArguments(
         FPS=60,
@@ -158,11 +184,13 @@ def main():
         memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 0.001},
-        criterion_factory=torch.nn.SmoothL1Loss,
+        criterion_factory=torch.nn.MSELoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
+    # test_agent_effectiveness(pursuer_0, 256, BATCH_SIZE)
+    # exit(0)
     pursuer_0.enable_explore = False
     torchinfo.summary(
         pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
@@ -178,7 +206,7 @@ def main():
         memory=8128 * 2,
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 0.001},
-        criterion_factory=torch.nn.SmoothL1Loss,
+        criterion_factory=torch.nn.MSELoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
@@ -196,20 +224,15 @@ def main():
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     try:
         train(runner, ITERATIONS, name_append=date_time)
-        pass
-    except KeyboardInterrupt:
-        print("Run interrupted")
-        return
-    finally:
         env.close()
 
-    # Record an episode
-    for agent in runner.agents.values():
-        agent.enable_explore = False
-    try:
+        # Record an episode
+        for agent in runner.agents.values():
+            agent.enable_explore = False
         record_episode(runner, record_name=f"recordings/{agent_name}_{date_time}")
     except KeyboardInterrupt:
         print("Run interrupted")
+        return
     finally:
         env.close()
 

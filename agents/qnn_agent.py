@@ -21,6 +21,7 @@ class QNNAgent(AbstractAgent):
     __slots__ = (
         "batch_size",
         "criterion",
+        "gamma",
         "optimizer",
         "lr_scheduler",
         "device",
@@ -48,6 +49,8 @@ class QNNAgent(AbstractAgent):
         auto_select_device: bool = True,
         memory: Memory | int = None,
         batch_size: int = 1,
+        gamma: float = 0.99,
+        epsilon: float = 0.1,
         name: str = "",
     ):
         AbstractAgent.__init__(self, env, env_name, name=name)
@@ -83,8 +86,9 @@ class QNNAgent(AbstractAgent):
             "cuda" if auto_select_device and torch.cuda.is_available() else "cpu"
         )
         self.to(self.device)
-        self.epsilon = 0.1
+        self.epsilon = epsilon
         self.enable_explore = True
+        self.gamma = gamma
 
     def __call__(self, obs: np.ndarray | torch.Tensor) -> (np.ndarray, Any):
         if isinstance(obs, np.ndarray):
@@ -99,16 +103,13 @@ class QNNAgent(AbstractAgent):
         obs = obs.to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
 
-        actions = np.array(
-            [
-                torch.argmax(po, dim=-1)
-                .detach()
-                .cpu()
-                .numpy()
-                .astype(np.long, copy=False)
-                for po in policy_outs
-            ]
-        ).squeeze().T
+        actions = (
+            torch.argmax(policy_outs, dim=-1)
+            .detach()
+            .cpu()
+            .numpy()
+            .astype(np.long, copy=False)
+        )
 
         action_values = self._action_to_action_values(actions)
         return action_values, actions
@@ -144,9 +145,10 @@ class QNNAgent(AbstractAgent):
         step_sizes = (action_space.high - action_space.low) / (out_features - 1)
         return step_sizes
 
-    def _call_policies(self, value: torch.Tensor) -> list[torch.Tensor]:
+    def _call_policies(self, value: torch.Tensor) -> [torch.Tensor]:
         # Concatenates the output of each policy model
-        return [pm(value).squeeze() for pm in self.policy_models]
+        policy_outs = [pm(value) for pm in self.policy_models]
+        return torch.cat(policy_outs, dim=-2)
 
     def forward(self, x) -> [torch.Tensor]:
         # value = self.value_model(x)
@@ -154,12 +156,10 @@ class QNNAgent(AbstractAgent):
         return actions
 
     def get_new_policy_targets(self, reward, new_value: torch.Tensor):
-        new_targets = []
         reward = reward.detach()
-        for v in self._call_policies(new_value):
-            new_targets.append(reward + torch.amax(v, dim=-1, keepdim=True))
-
-        return torch.stack(new_targets, dim=-1)
+        policy_out = self._call_policies(new_value)
+        new_targets = reward + self.gamma * torch.amax(policy_out, dim=-1)
+        return new_targets.float()
 
     def get_old_policy_targets(self, value: torch.Tensor, action):
         # Parse the actions to determine which was taken
@@ -167,16 +167,9 @@ class QNNAgent(AbstractAgent):
         # From the original_out, gather the output of the policy that was taken.
 
         # We need to transpose the actions to properly align the dimensions.
-        action = torch.tensor(action.T, device=self.device, dtype=torch.int64)
-        old_targets = [
-            # Given the index of the action,
-            # unsqueeze the action to add the target dimension at the end
-            # then gather the values at those indices.
-            # Finally, squeeze the result to put all the values in the same dimension.
-            o.gather(-1, a.unsqueeze(-1))
-            for o, a in zip(old_targets, action)
-        ]
-        return torch.stack(old_targets, dim=-1)
+        action = torch.from_numpy(action).long().to(self.device)
+        old_targets = old_targets.take(action)
+        return old_targets
 
     @property
     def in_features(self):
@@ -203,9 +196,7 @@ class QNNAgent(AbstractAgent):
 
     def update(self, batch_size: int = 1):
         self.train()
-        state, _, reward, new_state, _, action_index = self.memory.sample(
-            batch_size
-        )
+        state, _, reward, new_state, _, action_index = self.memory.sample(batch_size)
         state = torch.from_numpy(state).to(self.device).unsqueeze(1)
         reward = torch.from_numpy(reward).to(self.device).unsqueeze(1)
         new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(1)
@@ -216,6 +207,11 @@ class QNNAgent(AbstractAgent):
         new_policy_targets = self.get_new_policy_targets(reward, new_value)
 
         # Calculate loss
+        return self.apply_loss(old_policy_targets, new_policy_targets)
+
+    def apply_loss(
+        self, old_policy_targets: torch.Tensor, new_policy_targets: torch.Tensor
+    ):
         loss = self.criterion(old_policy_targets, new_policy_targets)
         self.optimizer.zero_grad()
         loss.backward()

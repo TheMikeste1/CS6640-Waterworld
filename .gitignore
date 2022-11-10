@@ -280,8 +280,8 @@ cython_debug/
 
 .idea/
 /runs/*
-!/runs/keep/*
+!/runs/keep/
 /models/*
-!/models/keep/*
+!/models/keep/
 /recordings/*
-!/recordings/keep/*
+!/recordings/keep/

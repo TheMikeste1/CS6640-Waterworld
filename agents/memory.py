@@ -11,6 +11,12 @@ class Memory:
     def __len__(self):
         return len(self.buffer)
 
+    def __repr__(self):
+        return f"Memory(items={len(self.buffer)}/{self.buffer.maxlen})"
+
+    def __str__(self):
+        return str(self.buffer)
+
     @property
     def max_size(self):
         return self.buffer.maxlen

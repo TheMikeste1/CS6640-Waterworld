@@ -16,11 +16,8 @@ from custom_waterworld import Runner, WaterworldArguments
 def on_post_episode(writer: SummaryWriter, runner, it, rewards, agent_posts):
     for agent_name in agent_posts.keys():
         reward = rewards[agent_name]
-        reward_sum = 0
-        for i, r in enumerate(reward):
-            writer.add_scalar(f"{agent_name}/reward_lifetime", r, i)
-            reward_sum += r
-        writer.add_scalar(f"{agent_name}/reward", reward_sum, it)
+        reward_sum = sum(reward)
+        writer.add_scalar(f"{agent_name}/total_reward", reward_sum, it)
 
 
 def on_post_train(writer: SummaryWriter, runner, it, agent_trains):

@@ -102,7 +102,8 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
 
     for agent in agents:
         torch.save(
-            agent.state_dict(), f"models/{agent.name}_{iterations}its_{name_append}.pt"
+            agent.state_dict(),
+            f"models/{agent.name}_{agent.env_name}_{iterations}its_{name_append}.pt",
         )
 
 

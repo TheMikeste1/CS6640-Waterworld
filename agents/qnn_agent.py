@@ -103,23 +103,15 @@ class QNNAgent(AbstractAgent):
         obs = obs.to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
 
-        actions = (
-            torch.argmax(policy_outs, dim=-1)
-            .detach()
-            .cpu()
-            .numpy()
-            .astype(np.long, copy=False)
-        )
+        actions = torch.argmax(policy_outs, dim=-1).detach().cpu()
 
         action_values = self._action_to_action_values(actions)
-        return action_values, actions.squeeze()
+        return action_values, actions.squeeze().long()
 
-    def _action_to_action_values(self, action: [torch.Tensor]) -> torch.Tensor:
+    def _action_to_action_values(self, action: torch.Tensor) -> torch.Tensor:
         action_space = self.env.action_space(self.env_name)
         step_sizes = self._calculate_step_size(action_space)
-        return (action * step_sizes + action_space.low).astype(
-            action_space.dtype, copy=False
-        )
+        return (action * step_sizes + action_space.low).to(torch.float32)
 
     def _action_values_to_action(
         self, action_values: np.ndarray

@@ -116,9 +116,9 @@ class DistanceNeuralNetwork(NeuralNetwork):
         # Collision features
         collision_obs = obs[..., current_slice : current_slice + 2]
         current_slice += 2
-        assert (
-            current_slice == obs.shape[-1]
-        ), f"Too many observations! Found {obs.shape[-1]} but expected {current_slice}"
+        # assert (
+        #     current_slice == obs.shape[-1].item()
+        # ), f"Too many observations! Found {obs.shape[-1]} but expected {current_slice}"
 
         # Stack all distance features
         distance_obs = torch.cat(

@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import custom_waterworld
 from agents import AbstractAgent, NeuralNetwork, QNNAgent
-from agents.DistanceNeuralNetwork import DistanceNeuralNetwork
+from agents.distance_neural_network import DistanceNeuralNetwork
 from agents.do_nothing_agent import DoNothingAgent
 from agents.human_agent import HumanAgent
 from custom_waterworld import Runner, WaterworldArguments
@@ -50,7 +50,13 @@ def record_episode(runner: Runner, record_name: str):
         env.render_mode = previous_mode
 
 
-def train(runner: Runner, iterations: int, name_prepend: str = "", verbose: bool = True):
+def train(
+    runner: Runner,
+    iterations: int,
+    name_prepend: str = "",
+    verbose: bool = True,
+    tensorboard_writer: SummaryWriter = None,
+):
     # noinspection PyGlobalUndefined
     global on_post_episode, on_post_train
 
@@ -60,15 +66,12 @@ def train(runner: Runner, iterations: int, name_prepend: str = "", verbose: bool
     agents = set(runner.agents.values())
     agent = next(iter(agents))
 
-    tensorboard_writer = SummaryWriter(
-        log_dir=f"runs/{name_prepend}_{agent.name}_{iterations}its"
-    )
+    if tensorboard_writer:
+        write_post_episode = partial(on_post_episode, tensorboard_writer)
+        runner.on_post_episode += write_post_episode
 
-    write_post_episode = partial(on_post_episode, tensorboard_writer)
-    runner.on_post_episode += write_post_episode
-
-    write_post_train = partial(on_post_train, tensorboard_writer)
-    runner.on_post_train += write_post_train
+        write_post_train = partial(on_post_train, tensorboard_writer)
+        runner.on_post_train += write_post_train
 
     if verbose:
         if env.render_mode == WaterworldArguments.RenderMode.HUMAN.value:
@@ -97,8 +100,9 @@ def train(runner: Runner, iterations: int, name_prepend: str = "", verbose: bool
     finally:
         env.close()
         tensorboard_writer.close()
-        runner.on_post_episode -= write_post_episode
-        runner.on_post_train -= write_post_train
+        if tensorboard_writer:
+            runner.on_post_episode -= write_post_episode
+            runner.on_post_train -= write_post_train
 
     for agent in agents:
         torch.save(
@@ -134,13 +138,13 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 1024
+    ITERATIONS = 128
     BATCH_SIZE = 4096
     agent_name = "qnn_distance"
     args = WaterworldArguments(
-        FPS=60,
+        # FPS=60
         render_mode=WaterworldArguments.RenderMode.NONE,
-        max_cycles=256,
+        max_cycles=512,
         # n_evaders=5 * 3,
         # n_poisons=10 * 3,
     )
@@ -190,7 +194,7 @@ def main():
         batch_size=BATCH_SIZE,
         memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.001},
+        optimizer_kwargs={"lr": 0.0001},
         criterion_factory=torch.nn.CrossEntropyLoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
@@ -199,9 +203,9 @@ def main():
     # test_agent_effectiveness(pursuer_0, 256, BATCH_SIZE)
     # exit(0)
     pursuer_0.enable_explore = False
-    torchinfo.summary(
-        pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
-    )
+    # torchinfo.summary(
+    #     pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
+    # )
     pursuer_0.enable_explore = True
 
     pursuer_1 = QNNAgent(
@@ -212,23 +216,40 @@ def main():
         batch_size=BATCH_SIZE,
         memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.001},
+        optimizer_kwargs={"lr": 0.0001},
         criterion_factory=torch.nn.CrossEntropyLoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
 
+    agents = {
+        "pursuer_0": pursuer_0,
+        "pursuer_1": pursuer_1,
+    }
+
     runner = Runner(
         env,
-        agents={
-            "pursuer_0": pursuer_0,
-            "pursuer_1": pursuer_1,
-        },
+        agents=agents,
         should_render_empty=args.render_mode == WaterworldArguments.RenderMode.HUMAN,
     )
 
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    tensorboard_writer = SummaryWriter(
+        log_dir=f"runs/{date_time}_{agent_name}_{ITERATIONS}its"
+    )
+    for env_name, agent in agents.items():
+        was_exploring = agent.enable_explore
+        agent.enable_explore = False
+        tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
+        agent.enable_explore = was_exploring
+        tensorboard_writer.add_text(f"{env_name}/name", agent.name)
+        tensorboard_writer.add_text(f"{env_name}/batch_size", str(agent.batch_size))
+        tensorboard_writer.add_text(f"{env_name}/memory", str(len(agent.memory)))
+        tensorboard_writer.add_text(f"{env_name}/optimizer", str(agent.optimizer))
+        tensorboard_writer.add_text(f"{env_name}/criterion", str(agent.criterion))
+        tensorboard_writer.add_text(f"{env_name}/lr_scheduler", str(agent.lr_scheduler))
+    exit(0)
     try:
         train(runner, ITERATIONS, name_prepend=date_time)
         env.close()

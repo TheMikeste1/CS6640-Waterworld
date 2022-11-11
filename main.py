@@ -134,15 +134,15 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 512
+    ITERATIONS = 1024
     BATCH_SIZE = 4096
     agent_name = "qnn_distance"
     args = WaterworldArguments(
         FPS=60,
         render_mode=WaterworldArguments.RenderMode.NONE,
-        max_cycles=512,
-        n_evaders=5 * 3,
-        n_poisons=10 * 3,
+        max_cycles=256,
+        # n_evaders=5 * 3,
+        # n_poisons=10 * 3,
     )
     env = waterworld.env(**args.to_dict())
 
@@ -154,9 +154,9 @@ def main():
             layers=[
                 # out_channels * num_sensors + 2 collision features + 3 speed layers
                 torch.nn.Linear(64 * num_sensors + 2 + num_sensors * 3, 256),
-                torch.nn.ReLU(),
+                torch.nn.LeakyReLU(),
                 torch.nn.Linear(256, 256),
-                torch.nn.ReLU(),
+                torch.nn.LeakyReLU(),
                 torch.nn.Linear(256, 3),
             ],
             distance_layers=[
@@ -167,7 +167,7 @@ def main():
                     kernel_size=3,
                     padding=1,
                 ),
-                torch.nn.ReLU(),
+                torch.nn.LeakyReLU(),
                 torch.nn.Conv1d(
                     in_channels=32,
                     out_channels=64,
@@ -191,7 +191,7 @@ def main():
         memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 0.001},
-        criterion_factory=torch.nn.MSELoss,
+        criterion_factory=torch.nn.CrossEntropyLoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
@@ -213,7 +213,7 @@ def main():
         memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 0.001},
-        criterion_factory=torch.nn.MSELoss,
+        criterion_factory=torch.nn.CrossEntropyLoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},

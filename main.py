@@ -50,7 +50,7 @@ def record_episode(runner: Runner, record_name: str):
         env.render_mode = previous_mode
 
 
-def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool = True):
+def train(runner: Runner, iterations: int, name_prepend: str = "", verbose: bool = True):
     # noinspection PyGlobalUndefined
     global on_post_episode, on_post_train
 
@@ -61,7 +61,7 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
     agent = next(iter(agents))
 
     tensorboard_writer = SummaryWriter(
-        log_dir=f"runs/{agent.name}_{iterations}its_{name_append}"
+        log_dir=f"runs/{name_prepend}_{agent.name}_{iterations}its"
     )
 
     write_post_episode = partial(on_post_episode, tensorboard_writer)
@@ -91,7 +91,7 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
         for agent in agents:
             torch.save(
                 agent.state_dict(),
-                f"models/interrupted/{agent.name}_{agent.env_name}_{name_append}.pt",
+                f"models/interrupted/{name_prepend}_{agent.name}_{agent.env_name}.pt",
             )
         return
     finally:
@@ -103,7 +103,7 @@ def train(runner: Runner, iterations: int, name_append: str = "", verbose: bool 
     for agent in agents:
         torch.save(
             agent.state_dict(),
-            f"models/{agent.name}_{agent.env_name}_{iterations}its_{name_append}.pt",
+            f"models/{name_prepend}_{agent.name}_{agent.env_name}_{iterations}its.pt",
         )
 
 
@@ -230,7 +230,7 @@ def main():
 
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     try:
-        train(runner, ITERATIONS, name_append=date_time)
+        train(runner, ITERATIONS, name_prepend=date_time)
         env.close()
 
         # Record an episode
@@ -238,7 +238,7 @@ def main():
             agent.enable_explore = False
         record_episode(
             runner,
-            record_name=f"recordings/{agent_name}_{ITERATIONS}its_{date_time}",
+            record_name=f"recordings/{date_time}_{agent_name}_{ITERATIONS}its",
         )
     except KeyboardInterrupt:
         print("Run interrupted")

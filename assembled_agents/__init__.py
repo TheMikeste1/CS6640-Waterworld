@@ -1,7 +1,7 @@
 import torch
 
 from agents import NeuralNetwork, QNNAgent
-from agents.DistanceNeuralNetwork import DistanceNeuralNetwork
+from agents.distance_neural_network import DistanceNeuralNetwork
 
 
 def generate_simple_linear_256_64_3(num_obs: int):

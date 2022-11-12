@@ -1,7 +1,10 @@
 -r ./agents/requirements.txt
 -r ./custom_waterworld/requirements.txt
 imageio[ffmpeg]
+matplotlib
+pandas
 pettingzoo
+seaborn
 scipy~=1.9.3
 tensorboard~=2.11.0
 torchinfo~=1.7.1

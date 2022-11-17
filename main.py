@@ -99,8 +99,8 @@ def train(
         return
     finally:
         env.close()
-        tensorboard_writer.close()
         if tensorboard_writer:
+            tensorboard_writer.close()
             runner.on_post_episode -= write_post_episode
             runner.on_post_train -= write_post_train
 
@@ -194,7 +194,7 @@ def main():
         batch_size=BATCH_SIZE,
         memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.0001},
+        optimizer_kwargs={"lr": 0.0003},
         criterion_factory=torch.nn.CrossEntropyLoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
@@ -216,7 +216,7 @@ def main():
         batch_size=BATCH_SIZE,
         memory=BATCH_SIZE * 2,
         optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.0001},
+        optimizer_kwargs={"lr": 0.0003},
         criterion_factory=torch.nn.CrossEntropyLoss,
         criterion_kwargs={},
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
@@ -249,9 +249,14 @@ def main():
         tensorboard_writer.add_text(f"{env_name}/optimizer", str(agent.optimizer))
         tensorboard_writer.add_text(f"{env_name}/criterion", str(agent.criterion))
         tensorboard_writer.add_text(f"{env_name}/lr_scheduler", str(agent.lr_scheduler))
-    exit(0)
+
     try:
-        train(runner, ITERATIONS, name_prepend=date_time)
+        train(
+            runner,
+            ITERATIONS,
+            name_prepend=date_time,
+            tensorboard_writer=tensorboard_writer,
+        )
         env.close()
 
         # Record an episode

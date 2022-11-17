@@ -90,7 +90,7 @@ class QNNAgent(AbstractAgent):
         self.enable_explore = True
         self.gamma = gamma
 
-    def __call__(self, obs: np.ndarray | torch.Tensor) -> (np.ndarray, Any):
+    def __call__(self, obs: np.ndarray | torch.Tensor) -> (torch.Tensor, Any):
         if isinstance(obs, np.ndarray):
             obs = torch.from_numpy(obs)
         # If obs is not in batch form, add a batch dimension
@@ -98,7 +98,9 @@ class QNNAgent(AbstractAgent):
             obs = obs.unsqueeze(-2)
         if self.enable_explore and np.random.random() < self.epsilon:
             actions = self._get_random_actions(num_actions=obs.shape[0]).squeeze()
-            return self._action_to_action_values(actions), actions
+            actions = torch.from_numpy(actions)
+            action_values = self._action_to_action_values(actions)
+            return action_values, actions
         self.eval()
         obs = obs.to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
@@ -175,6 +177,9 @@ class QNNAgent(AbstractAgent):
         return self.policy_models[0].out_features
 
     def post_step(self, data: StepData):
+        agent_info = data.agent_info
+        if isinstance(agent_info, torch.Tensor):
+            agent_info = agent_info.detach().cpu().numpy()
         self.memory.add(
             (
                 data.state,
@@ -182,7 +187,7 @@ class QNNAgent(AbstractAgent):
                 data.reward,
                 data.next_state,
                 data.terminated,
-                data.agent_info,
+                agent_info,
             )
         )
 

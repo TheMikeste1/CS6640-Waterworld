@@ -1,7 +1,7 @@
 from typing import Any
 
-import numpy as np
 import pygame
+import torch
 
 from agents import AbstractAgent
 
@@ -14,14 +14,14 @@ class HumanAgent(AbstractAgent):
         self.left_pressed = False
         self.right_pressed = False
 
-    def __call__(self, obs) -> (np.ndarray, Any):
+    def __call__(self, obs) -> (torch.Tensor, Any):
         self.gather_inputs()
         command = [
             self.right_pressed - self.left_pressed,
             self.up_pressed - self.down_pressed,
         ]
 
-        return np.array(command, dtype=np.float32), None
+        return torch.Tensor(command, dtype=torch.float32), None
 
     def gather_inputs(self):
         for event in pygame.event.get():

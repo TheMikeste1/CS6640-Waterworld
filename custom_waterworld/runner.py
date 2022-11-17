@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, TYPE_CHECKING
 
 import numpy as np
 import pettingzoo as pz
+import torch
 from tqdm import tqdm
 
 from agents.step_data import StepData
@@ -136,7 +137,8 @@ class Runner:
             rewards[agent_name].append(reward)
             agent = self.agents[agent_name]
             action, agent_info = agent(obs)
-            action = action.squeeze()
+            action = action.detach().cpu().numpy()
+            action = action.squeeze()  # Remove any extra dimensions
 
             # If the agent is dead or truncated the only allowed action is None
             env.step(None if terminated or truncated else action)

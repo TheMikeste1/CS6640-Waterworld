@@ -271,6 +271,7 @@ def main():
         return
     finally:
         env.close()
+        tensorboard_writer.close()
 
 
 if __name__ == "__main__":

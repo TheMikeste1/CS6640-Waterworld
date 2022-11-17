@@ -1,14 +1,17 @@
 from typing import Any
 
 import numpy as np
+import torch
 
 from agents import AbstractAgent
 
 
 class DoNothingAgent(AbstractAgent):
-    def __call__(self, obs) -> (np.ndarray, Any):
+    def __call__(self, obs) -> (torch.Tensor, Any):
         return (
-            np.zeros(self.env.action_space(self.env_name).shape, dtype=np.float32),
+            torch.zeros(
+                self.env.action_space(self.env_name).shape, dtype=torch.float32
+            ),
             None,
         )
 

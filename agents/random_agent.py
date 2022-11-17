@@ -1,15 +1,14 @@
 from __future__ import annotations
 from typing import Any, TYPE_CHECKING
 
-from agents import AbstractAgent
+import torch
 
-if TYPE_CHECKING:
-    import numpy as np
+from agents import AbstractAgent
 
 
 class RandomAgent(AbstractAgent):
-    def __call__(self, obs) -> (np.ndarray, Any):
-        return self.env.action_space(self.env_name).sample(), None
+    def __call__(self, obs) -> (torch.Tensor, Any):
+        return torch.from_numpy(self.env.action_space(self.env_name).sample()), None
 
     @property
     def in_features(self):

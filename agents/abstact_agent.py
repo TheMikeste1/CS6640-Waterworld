@@ -23,7 +23,7 @@ class AbstractAgent(ABC, torch.nn.Module):
         self.device = torch.device("cpu")
 
     @abstractmethod
-    def __call__(self, obs) -> (np.ndarray, Any):
+    def __call__(self, obs) -> (torch.Tensor, Any):
         pass
 
     def post_step(self, data: StepData):

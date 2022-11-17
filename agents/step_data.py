@@ -12,5 +12,5 @@ class StepData:
     reward: float
     terminated: bool
     truncated: bool
-    info: dict
+    info: Any
     agent_info: Any

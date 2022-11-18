@@ -46,7 +46,7 @@ class QNNAgent(AbstractAgent):
         optimizer_kwargs: dict = None,
         criterion_kwargs: dict = None,
         lr_scheduler_kwargs: dict = None,
-        auto_select_device: bool = True,
+        device: str | torch.device = None,
         memory: Memory | int = None,
         batch_size: int = 1,
         gamma: float = 0.99,
@@ -82,9 +82,9 @@ class QNNAgent(AbstractAgent):
             memory = Memory(memory)
         self.memory = memory
         self.batch_size = batch_size
-        self.device = torch.device(
-            "cuda" if auto_select_device and torch.cuda.is_available() else "cpu"
-        )
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.to(self.device)
         self.epsilon = epsilon
         self.enable_explore = True

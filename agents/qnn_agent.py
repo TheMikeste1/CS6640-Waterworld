@@ -105,7 +105,7 @@ class QNNAgent(AbstractAgent):
         obs = obs.to(self.device)
         policy_outs = torch.nn.Module.__call__(self, obs)
 
-        actions = torch.argmax(policy_outs, dim=-1).detach().cpu()
+        actions = torch.argmax(policy_outs, dim=-1).cpu()
 
         action_values = self._action_to_action_values(actions)
         return action_values, actions.squeeze().long()
@@ -139,12 +139,12 @@ class QNNAgent(AbstractAgent):
         step_sizes = (action_space.high - action_space.low) / (out_features - 1)
         return step_sizes
 
-    def _call_policies(self, value: torch.Tensor) -> [torch.Tensor]:
+    def _call_policies(self, value: torch.Tensor) -> torch.Tensor:
         # Concatenates the output of each policy model
         policy_outs = [pm(value) for pm in self.policy_models]
         return torch.cat(policy_outs, dim=-2)
 
-    def forward(self, x) -> [torch.Tensor]:
+    def forward(self, x) -> torch.Tensor:
         # value = self.value_model(x)
         actions = self._call_policies(x)
         return actions
@@ -209,6 +209,8 @@ class QNNAgent(AbstractAgent):
     def apply_loss(
         self, old_policy_targets: torch.Tensor, new_policy_targets: torch.Tensor
     ):
+        old_policy_targets = old_policy_targets.to(self.device)
+        new_policy_targets = new_policy_targets.to(self.device)
         loss = self.criterion(old_policy_targets, new_policy_targets)
         self.optimizer.zero_grad()
         loss.backward()

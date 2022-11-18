@@ -2,16 +2,19 @@ import os.path
 from datetime import datetime
 from functools import partial
 
+import seaborn as sns
 import torch.nn
 import torchinfo
 from pettingzoo.sisl import waterworld_v4 as waterworld
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 import custom_waterworld
 from agents import AbstractAgent, NeuralNetwork, QNNAgent
 from agents.distance_neural_network import DistanceNeuralNetwork
 from agents.do_nothing_agent import DoNothingAgent
 from agents.human_agent import HumanAgent
+from assembled_agents import *
 from custom_waterworld import Runner, WaterworldArguments
 
 
@@ -86,7 +89,7 @@ def train(
     # Train
     try:
         runner.run_iterations(iterations)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
         if verbose:
             print("Run interrupted")
         if not os.path.exists("models/interrupted"):
@@ -96,7 +99,7 @@ def train(
                 agent.state_dict(),
                 f"models/interrupted/{name_prepend}_{agent.name}_{agent.env_name}.pt",
             )
-        return
+        raise e from None
     finally:
         env.close()
         if tensorboard_writer:
@@ -113,34 +116,51 @@ def train(
 
 def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: int):
     device = agent.device
-    for _ in range(iterations):
+    losses = []
+    power = 3
+    print(f"Testing {agent.name} on {agent.env_name} for {iterations} iterations")
+    for _ in tqdm(range(iterations)):
         test_input = torch.rand(
-            size=(batch_size, agent.in_features), dtype=torch.float
+            size=(batch_size, 1, agent.in_features), dtype=torch.float
         ).to(device)
-        _, test_output = agent(test_input)
-        test_output = torch.from_numpy(test_output).to(device).float()
+        test_output = agent.forward(test_input)
 
         # policy to always take a specified action
         y = torch.ones(
-            size=(batch_size, agent.env.action_space(agent.env_name).shape[0]),
+            size=(
+                batch_size,
+                agent.env.action_space(agent.env_name).shape[0],
+                agent.out_features,
+            ),
             dtype=test_output.dtype,
         ).to(device)
         assert test_output.shape == y.shape
 
         # Choose a power we want to learn
-        y *= 3
+        y *= power
 
         # Calculate the loss
-        agent.apply_loss(test_output, y)
-    test_input = torch.rand(size=(1, agent.in_features), dtype=torch.float).to(device)
-    out = agent(test_input)
-    print(out)
+        loss = agent.apply_loss(test_output, y)
+        losses.append(loss)
+    test_input = torch.rand(size=(1, 1, agent.in_features), dtype=torch.float).to(
+        device
+    )
+    out = agent.forward(test_input)
+    print(
+        f"Policy out (should be near {1 / agent.out_features :.5f}): {out.mean().item()}"
+    )
+    print(f"Average loss: {sum(losses) / len(losses)}")
+    print(f"Max loss: {max(losses)}")
+    print(f"Min loss: {min(losses)}")
+    plot = sns.lineplot(x=range(len(losses)), y=losses)
+    plot.figure.show()
+    exit(0)
 
 
 def main():
-    ITERATIONS = 128
-    BATCH_SIZE = 4096
-    agent_name = "qnn_distance"
+    ITERATIONS = 512
+    BATCH_SIZE = 1024
+    agent_name = "qnn_distance_with_logsoftmax"
     args = WaterworldArguments(
         # FPS=60
         render_mode=WaterworldArguments.RenderMode.NONE,
@@ -153,38 +173,12 @@ def main():
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
     num_sensors = args.n_sensors
     # Create agents
-    policy_networks = [
-        DistanceNeuralNetwork(
-            layers=[
-                # out_channels * num_sensors + 2 collision features + 3 speed layers
-                torch.nn.Linear(64 * num_sensors + 2 + num_sensors * 3, 256),
-                torch.nn.LeakyReLU(),
-                torch.nn.Linear(256, 256),
-                torch.nn.LeakyReLU(),
-                torch.nn.Linear(256, 3),
-            ],
-            distance_layers=[
-                torch.nn.BatchNorm1d(5),
-                torch.nn.Conv1d(
-                    in_channels=5,
-                    out_channels=32,
-                    kernel_size=3,
-                    padding=1,
-                ),
-                torch.nn.LeakyReLU(),
-                torch.nn.Conv1d(
-                    in_channels=32,
-                    out_channels=64,
-                    kernel_size=3,
-                    padding=1,
-                ),
-                torch.nn.BatchNorm1d(64),
-            ],
-            speed_features=True,
-            num_sensors=num_sensors,
-        )
-        for _ in range(2)
-    ]
+    policy_networks = []
+    for _ in range(2):
+        network = generate_qnn_distance(num_sensors)
+        # network = generate_simple_linear_256_64_3(num_obs)
+        network += torch.nn.LogSoftmax(dim=-1)
+        policy_networks.append(network)
 
     pursuer_0 = QNNAgent(
         env,
@@ -200,12 +194,14 @@ def main():
         lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
         lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
     )
-    # test_agent_effectiveness(pursuer_0, 256, BATCH_SIZE)
-    # exit(0)
+
+    # WARNING: This will exit the program
+    # test_agent_effectiveness(pursuer_0, 512, BATCH_SIZE)
+
     pursuer_0.enable_explore = False
-    # torchinfo.summary(
-    #     pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
-    # )
+    torchinfo.summary(
+        pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
+    )
     pursuer_0.enable_explore = True
 
     pursuer_1 = QNNAgent(
@@ -239,10 +235,10 @@ def main():
         log_dir=f"runs/{date_time}_{agent_name}_{ITERATIONS}its"
     )
     for env_name, agent in agents.items():
-        was_exploring = agent.enable_explore
-        agent.enable_explore = False
-        tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
-        agent.enable_explore = was_exploring
+        # was_exploring = agent.enable_explore
+        # agent.enable_explore = False
+        # tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
+        # agent.enable_explore = was_exploring
         tensorboard_writer.add_text(f"{env_name}/name", agent.name)
         tensorboard_writer.add_text(f"{env_name}/batch_size", str(agent.batch_size))
         tensorboard_writer.add_text(f"{env_name}/memory", str(len(agent.memory)))
@@ -262,6 +258,7 @@ def main():
         # Record an episode
         for agent in runner.agents.values():
             agent.enable_explore = False
+        print("Recording an episode. . .")
         record_episode(
             runner,
             record_name=f"recordings/{date_time}_{agent_name}_{ITERATIONS}its",

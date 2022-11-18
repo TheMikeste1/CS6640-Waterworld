@@ -58,3 +58,7 @@ class NeuralNetwork(torch.nn.Module):
     @property
     def out_features(self) -> int:
         return self.__num_outputs
+
+    def __iadd__(self, other: torch.nn.Module):
+        self.layers.append(other)
+        return self

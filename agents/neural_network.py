@@ -18,9 +18,12 @@ class NeuralNetwork(torch.nn.Module):
 
     def __init__(
         self,
-        layers: [torch.nn.Module],
+        layers: [torch.nn.Module] | torch.nn.Module,
     ):
         super().__init__()
+        if isinstance(layers, torch.nn.Module):
+            layers = [layers]
+
         self.layers = torch.nn.Sequential(*layers)
         self.__num_inputs = 0
 

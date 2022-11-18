@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 import custom_waterworld
 from agents import AbstractAgent, NeuralNetwork, QNNAgent
+from agents.a2c import A2CAgent
 from agents.distance_neural_network import DistanceNeuralNetwork
 from agents.do_nothing_agent import DoNothingAgent
 from agents.human_agent import HumanAgent
@@ -123,7 +124,7 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
         test_input = torch.rand(
             size=(batch_size, 1, agent.in_features), dtype=torch.float
         ).to(device)
-        test_output = agent.forward(test_input)
+        test_output, *_ = agent.forward(test_input)
 
         # policy to always take a specified action
         y = torch.ones(
@@ -145,9 +146,10 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
     test_input = torch.rand(size=(1, 1, agent.in_features), dtype=torch.float).to(
         device
     )
-    out = agent.forward(test_input)
+    out, *_ = agent.forward(test_input)
     print(
-        f"Policy out (should be near {1 / agent.out_features :.5f}): {out.mean().item()}"
+        f"Policy out (should be near {1 / agent.out_features :.5f}): "
+        f"{out.mean().item()}"
     )
     print(f"Average loss: {sum(losses) / len(losses)}")
     print(f"Max loss: {max(losses)}")
@@ -180,19 +182,13 @@ def main():
         network += torch.nn.LogSoftmax(dim=-1)
         policy_networks.append(network)
 
-    pursuer_0 = QNNAgent(
+    pursuer_0 = A2CAgent(
         env,
         "pursuer_0",
         name=agent_name,
-        policy_models=policy_networks,
-        batch_size=BATCH_SIZE,
-        memory=BATCH_SIZE * 2,
-        optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.0003},
-        criterion_factory=torch.nn.CrossEntropyLoss,
-        criterion_kwargs={},
-        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
-        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
+        shared_network=NeuralNetwork(torch.nn.Linear(num_obs, num_obs)),
+        policy_networks=policy_networks,
+        advantage_network=NeuralNetwork(torch.nn.Linear(num_obs, 1)),
     )
 
     # WARNING: This will exit the program
@@ -204,20 +200,7 @@ def main():
     )
     pursuer_0.enable_explore = True
 
-    pursuer_1 = QNNAgent(
-        env,
-        "pursuer_1",
-        name=agent_name,
-        policy_models=policy_networks,
-        batch_size=BATCH_SIZE,
-        memory=BATCH_SIZE * 2,
-        optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 0.0003},
-        criterion_factory=torch.nn.CrossEntropyLoss,
-        criterion_kwargs={},
-        lr_scheduler_factory=torch.optim.lr_scheduler.StepLR,
-        lr_scheduler_kwargs={"step_size": 1, "gamma": 0.99},
-    )
+    pursuer_1 = pursuer_0
 
     agents = {
         "pursuer_0": pursuer_0,
@@ -231,20 +214,21 @@ def main():
     )
 
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    tensorboard_writer = SummaryWriter(
-        log_dir=f"runs/{date_time}_{agent_name}_{ITERATIONS}its"
-    )
-    for env_name, agent in agents.items():
-        # was_exploring = agent.enable_explore
-        # agent.enable_explore = False
-        # tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
-        # agent.enable_explore = was_exploring
-        tensorboard_writer.add_text(f"{env_name}/name", agent.name)
-        tensorboard_writer.add_text(f"{env_name}/batch_size", str(agent.batch_size))
-        tensorboard_writer.add_text(f"{env_name}/memory", str(len(agent.memory)))
-        tensorboard_writer.add_text(f"{env_name}/optimizer", str(agent.optimizer))
-        tensorboard_writer.add_text(f"{env_name}/criterion", str(agent.criterion))
-        tensorboard_writer.add_text(f"{env_name}/lr_scheduler", str(agent.lr_scheduler))
+    tensorboard_writer: SummaryWriter | None = None
+    # tensorboard_writer = SummaryWriter(
+    #     log_dir=f"runs/{date_time}_{agent_name}_{ITERATIONS}its"
+    # )
+    # for env_name, agent in agents.items():
+    #     # was_exploring = agent.enable_explore
+    #     # agent.enable_explore = False
+    #     # tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
+    #     # agent.enable_explore = was_exploring
+    #     tensorboard_writer.add_text(f"{env_name}/name", agent.name)
+    #     tensorboard_writer.add_text(f"{env_name}/batch_size", str(agent.batch_size))
+    #     tensorboard_writer.add_text(f"{env_name}/memory", str(len(agent.memory)))
+    #     tensorboard_writer.add_text(f"{env_name}/optimizer", str(agent.optimizer))
+    #     tensorboard_writer.add_text(f"{env_name}/criterion", str(agent.criterion))
+    #     tensorboard_writer.add_text(f"{env_name}/lr_scheduler", str(agent.lr_scheduler))
 
     try:
         train(
@@ -268,7 +252,8 @@ def main():
         return
     finally:
         env.close()
-        tensorboard_writer.close()
+        if tensorboard_writer:
+            tensorboard_writer.close()
 
 
 if __name__ == "__main__":

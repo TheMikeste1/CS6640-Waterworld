@@ -46,7 +46,7 @@ class AbstractAgent(ABC, torch.nn.Module):
     def update(self, batch_size: int):
         pass
 
-    def apply_loss(self, old_policy_targets, new_policy_targets):
+    def apply_loss(self, *args,  **kwargs):
         pass
 
     def to(self, *args, **kwargs):

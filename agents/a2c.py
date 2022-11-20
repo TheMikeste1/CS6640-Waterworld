@@ -1,19 +1,36 @@
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
+from typing import Any, Callable, Iterable, TYPE_CHECKING, Union
 
 import numpy as np
 import torch
 
 from agents import AbstractAgent
+from agents.memory import Memory
 
 if TYPE_CHECKING:
     import pettingzoo as pz
 
     from agents import NeuralNetwork
+    from agents.step_data import StepData
+
+    # noinspection PyUnresolvedReferences,PyProtectedMember
+    AbstractLRScheduler = torch.optim.lr_scheduler._LRScheduler
 
 
 class A2CAgent(AbstractAgent):
-    __slots__ = ("advantage_network", "device", "shared_network", "policy_networks")
+    __slots__ = (
+        "advantage_network",
+        "batch_size",
+        "criterion",
+        "critic_loss_weight",
+        "device",
+        "gamma",
+        "lr_scheduler",
+        "memory",
+        "optimizer",
+        "policy_networks",
+        "shared_network",
+    )
 
     def __init__(
         self,
@@ -22,10 +39,30 @@ class A2CAgent(AbstractAgent):
         shared_network: NeuralNetwork,
         advantage_network: NeuralNetwork,
         policy_networks: [NeuralNetwork],
+        optimizer_factory: Callable[
+            [Iterable[torch.Tensor], ...], torch.optim.Optimizer
+        ],
+        criterion_factory: Union[
+            Callable[[...], torch.nn.Module], Callable[[...], torch.Tensor]
+        ],
+        lr_scheduler_factory: Callable[
+            [torch.optim.Optimizer, ...], AbstractLRScheduler
+        ] = None,
+        optimizer_kwargs: dict = None,
+        criterion_kwargs: dict = None,
+        lr_scheduler_kwargs: dict = None,
         device: str | torch.device = None,
+        memory: Memory | int = None,
+        batch_size: int = 1,
+        gamma: float = 0.99,
+        critic_loss_weight: float = 0.5,
         name: str = "",
     ):
         AbstractAgent.__init__(self, env, env_name, name=name)
+        if lr_scheduler_factory is None and lr_scheduler_kwargs is not None:
+            raise ValueError(
+                "lr_scheduler_kwargs cannot be specified without lr_scheduler_factory"
+            )
 
         assert (
             shared_network.in_features == env.observation_space(self.env_name).shape[0]
@@ -60,10 +97,29 @@ class A2CAgent(AbstractAgent):
         self.advantage_network = advantage_network
         self.policy_networks = torch.nn.ModuleList(policy_networks)
 
+        self.optimizer = optimizer_factory(
+            self.parameters(), **(optimizer_kwargs or {})
+        )
+        self.criterion = criterion_factory(**(criterion_kwargs or {}))
+        self.lr_scheduler = (
+            lr_scheduler_factory(self.optimizer, **(lr_scheduler_kwargs or {}))
+            if lr_scheduler_factory
+            else None
+        )
+
+        if memory is None:
+            memory = Memory(2048)
+        elif isinstance(memory, int):
+            memory = Memory(memory)
+        self.memory = memory
+        self.batch_size = batch_size
+
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = device
         self.to(self.device)
+        self.gamma = gamma
+        self.critic_loss_weight = critic_loss_weight
 
     def __call__(self, obs) -> (torch.Tensor, Any):
         if isinstance(obs, np.ndarray):
@@ -113,3 +169,48 @@ class A2CAgent(AbstractAgent):
     def out_features(self):
         # Advantage layer + actions from policy layers
         return 1 + len(self.policy_networks)
+
+    def on_train(self):
+        return self.update(self.batch_size)
+
+    def post_step(self, data: StepData):
+        agent_info = data.agent_info
+        if isinstance(agent_info, torch.Tensor):
+            agent_info = agent_info.detach().cpu().numpy()
+        self.memory.add(
+            (
+                data.state,
+                data.action,
+                data.reward,
+                data.next_state,
+                data.terminated,
+                agent_info,
+            )
+        )
+
+    def update(self, batch_size: int = 1):
+        self.train()
+        state, _, reward, new_state, _, log_probabilities = self.memory.sample(
+            batch_size
+        )
+        state = torch.from_numpy(state).to(self.device).unsqueeze(1)
+        reward = torch.from_numpy(reward).to(self.device).unsqueeze(1).unsqueeze(1)
+        new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(1)
+        log_probabilities = torch.from_numpy(log_probabilities).to(self.device)
+
+        _, advantage = self.forward(state)
+        _, new_advantage = self.forward(new_state)
+        target_advantage = (reward + self.gamma * new_advantage).to(advantage.dtype)
+
+        return self.apply_loss(advantage, target_advantage, log_probabilities)
+
+    def apply_loss(self, advantage, target_advantage, log_probabilities):
+        actor_loss = (log_probabilities * abs(advantage - target_advantage)).sum()
+        critic_loss = self.criterion(advantage, target_advantage)
+        loss = actor_loss + (critic_loss * self.critic_loss_weight)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
+        return loss.item()

@@ -187,20 +187,45 @@ def main():
         "pursuer_0",
         name=agent_name,
         shared_network=NeuralNetwork(torch.nn.Linear(num_obs, num_obs)),
-        policy_networks=policy_networks,
         advantage_network=NeuralNetwork(torch.nn.Linear(num_obs, 1)),
+        policy_networks=policy_networks,
+        optimizer_factory=torch.optim.Adam,
+        optimizer_kwargs={"lr": 1e-3},
+        criterion_factory=torch.nn.HuberLoss,
+        criterion_kwargs={"reduction": "mean"},
+        lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        lr_scheduler_kwargs={"gamma": 0.99},
+        batch_size=BATCH_SIZE,
+        memory=BATCH_SIZE * 2,
+        gamma=0.99,
     )
 
     # WARNING: This will exit the program
     # test_agent_effectiveness(pursuer_0, 512, BATCH_SIZE)
 
-    pursuer_0.enable_explore = False
-    torchinfo.summary(
-        pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
-    )
-    pursuer_0.enable_explore = True
+    # pursuer_0.enable_explore = False
+    # torchinfo.summary(
+    #     pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
+    # )
+    # pursuer_0.enable_explore = True
 
-    pursuer_1 = pursuer_0
+    pursuer_1 = A2CAgent(
+        env,
+        "pursuer_1",
+        name=agent_name,
+        shared_network=NeuralNetwork(torch.nn.Linear(num_obs, num_obs)),
+        advantage_network=NeuralNetwork(torch.nn.Linear(num_obs, 1)),
+        policy_networks=policy_networks,
+        optimizer_factory=torch.optim.Adam,
+        optimizer_kwargs={"lr": 1e-3},
+        criterion_factory=torch.nn.HuberLoss,
+        criterion_kwargs={"reduction": "mean"},
+        lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        lr_scheduler_kwargs={"gamma": 0.99},
+        batch_size=BATCH_SIZE,
+        memory=BATCH_SIZE * 2,
+        gamma=0.99,
+    )
 
     agents = {
         "pursuer_0": pursuer_0,
@@ -215,20 +240,20 @@ def main():
 
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     tensorboard_writer: SummaryWriter | None = None
-    # tensorboard_writer = SummaryWriter(
-    #     log_dir=f"runs/{date_time}_{agent_name}_{ITERATIONS}its"
-    # )
-    # for env_name, agent in agents.items():
-    #     # was_exploring = agent.enable_explore
-    #     # agent.enable_explore = False
-    #     # tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
-    #     # agent.enable_explore = was_exploring
-    #     tensorboard_writer.add_text(f"{env_name}/name", agent.name)
-    #     tensorboard_writer.add_text(f"{env_name}/batch_size", str(agent.batch_size))
-    #     tensorboard_writer.add_text(f"{env_name}/memory", str(len(agent.memory)))
-    #     tensorboard_writer.add_text(f"{env_name}/optimizer", str(agent.optimizer))
-    #     tensorboard_writer.add_text(f"{env_name}/criterion", str(agent.criterion))
-    #     tensorboard_writer.add_text(f"{env_name}/lr_scheduler", str(agent.lr_scheduler))
+    tensorboard_writer = SummaryWriter(
+        log_dir=f"runs/{date_time}_{agent_name}_{ITERATIONS}its"
+    )
+    for env_name, agent in agents.items():
+        # was_exploring = agent.enable_explore
+        # agent.enable_explore = False
+        # tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
+        # agent.enable_explore = was_exploring
+        tensorboard_writer.add_text(f"{env_name}/name", agent.name)
+        tensorboard_writer.add_text(f"{env_name}/batch_size", str(agent.batch_size))
+        tensorboard_writer.add_text(f"{env_name}/memory", str(len(agent.memory)))
+        tensorboard_writer.add_text(f"{env_name}/optimizer", str(agent.optimizer))
+        tensorboard_writer.add_text(f"{env_name}/criterion", str(agent.criterion))
+        tensorboard_writer.add_text(f"{env_name}/lr_scheduler", str(agent.lr_scheduler))
 
     try:
         train(

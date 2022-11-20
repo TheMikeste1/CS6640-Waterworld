@@ -107,7 +107,10 @@ class Runner:
             agent_info=agent_info,
         )
         if training:
-            self.agents[agent_name].post_step(step_data)
+            agent = self.agents[agent_name]
+            agent.train()
+            agent.post_step(step_data)
+            agent.eval()
         self.on_post_step(self, agent_name, step_data)
 
     def _post_train(self, iteration: int):
@@ -130,6 +133,9 @@ class Runner:
         env.reset()
         num_agents = env.num_agents
         self._render()
+
+        for agent in self.agents.values():
+            agent.eval()
 
         cached_data = dict()
         for i, agent_name in enumerate(env.agent_iter(), start=1):

@@ -30,7 +30,6 @@ class A2CAgent(AbstractAgent):
         "optimizer",
         "policy_networks",
         "shared_network",
-        "use_log_softmax_instead_of_softmax",
     )
 
     def __init__(
@@ -49,7 +48,6 @@ class A2CAgent(AbstractAgent):
         lr_scheduler_factory: Callable[
             [torch.optim.Optimizer, ...], AbstractLRScheduler
         ] = None,
-        use_log_softmax_instead_of_softmax: bool = True,
         optimizer_kwargs: dict = None,
         criterion_kwargs: dict = None,
         lr_scheduler_kwargs: dict = None,
@@ -128,7 +126,6 @@ class A2CAgent(AbstractAgent):
         self.batch_size = batch_size
         self.gamma = gamma
         self.critic_loss_weight = critic_loss_weight
-        self.use_log_softmax_instead_of_softmax = use_log_softmax_instead_of_softmax
 
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -184,10 +181,7 @@ class A2CAgent(AbstractAgent):
         shared_out = self.shared_network(x)
         advantage = self.advantage_network(shared_out)
         policy_out = self._call_policies(shared_out)
-        if self.use_log_softmax_instead_of_softmax:
-            policy_out = torch.nn.functional.log_softmax(policy_out, dim=-2)
-        else:
-            policy_out = torch.nn.functional.softmax(policy_out, dim=-2)
+        policy_out = torch.nn.functional.log_softmax(policy_out, dim=-2)
         return policy_out, advantage
 
     def get_possible_steps(self):

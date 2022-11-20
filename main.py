@@ -162,7 +162,7 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 def main():
     ITERATIONS = 512
     BATCH_SIZE = 1024
-    agent_name = "qnn_distance_with_logsoftmax"
+    agent_name = "a2c_distance_with_softmax"
     args = WaterworldArguments(
         # FPS=60
         render_mode=WaterworldArguments.RenderMode.NONE,
@@ -222,6 +222,24 @@ def main():
     )
     pursuer_0.enable_explore = True
 
+    shared_network = generate_qnn_distance(num_sensors)
+    advantage_network = NeuralNetwork(
+        layers=[
+            torch.nn.Linear(shared_network.out_features, 64),
+            torch.nn.ReLU(),
+            torch.nn.Linear(64, 1),
+        ]
+    )
+    policy_networks = [
+        NeuralNetwork(
+            layers=[
+                torch.nn.Linear(shared_network.out_features, 64),
+                torch.nn.ReLU(),
+                torch.nn.Linear(64, 5),
+            ]
+        )
+        for _ in range(num_actions)
+    ]
     pursuer_1 = A2CAgent(
         env,
         "pursuer_1",

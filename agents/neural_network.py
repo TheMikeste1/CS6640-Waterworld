@@ -65,3 +65,6 @@ class NeuralNetwork(torch.nn.Module):
     def __iadd__(self, other: torch.nn.Module):
         self.layers.append(other)
         return self
+
+    def __getitem__(self, item):
+        return self.layers[item]

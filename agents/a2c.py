@@ -93,6 +93,17 @@ class A2CAgent(AbstractAgent):
             f"{env.action_space(self.env_name).shape[0]}"
         )
 
+        # Verify the last layer of each pm is not a softmax;
+        # we will apply the softmax ourselves
+        for pm in policy_networks:
+            assert not isinstance(pm[-1], torch.nn.Softmax) and not isinstance(
+                pm[-1], torch.nn.LogSoftmax
+            ), (
+                "A2C policy_networks should not have a softmax layer "
+                "as the final layer. "
+                "The softmax will be applied automatically."
+            )
+
         self.shared_network = shared_network
         self.advantage_network = advantage_network
         self.policy_networks = torch.nn.ModuleList(policy_networks)
@@ -155,11 +166,35 @@ class A2CAgent(AbstractAgent):
         policy_outs = [pm(value) for pm in self.policy_networks]
         return torch.cat(policy_outs, dim=-2)
 
+    def apply_loss(self, advantage, target_advantage, log_probabilities):
+        actor_loss = (log_probabilities * abs(advantage - target_advantage)).sum()
+        critic_loss = self.criterion(advantage, target_advantage)
+        loss = actor_loss + (critic_loss * self.critic_loss_weight)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
+        return loss.item()
+
     def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         shared_out = self.shared_network(x)
         advantage = self.advantage_network(shared_out)
         policy_out = self._call_policies(shared_out)
+        policy_out = torch.nn.functional.log_softmax(policy_out, dim=-2)
         return policy_out, advantage
+
+    def get_possible_steps(self):
+        action_space = self.env.action_space(self.env_name)
+        step_sizes = self._calculate_step_size(action_space)
+        high = action_space.high
+        low = action_space.low
+        possible_steps = []
+        for i in range(len(step_sizes)):
+            possible_steps.append(
+                np.arange(low[i], high[i] + step_sizes[i], step_sizes[i])
+            )
+        return possible_steps
 
     @property
     def in_features(self):
@@ -203,14 +238,3 @@ class A2CAgent(AbstractAgent):
         target_advantage = (reward + self.gamma * new_advantage).to(advantage.dtype)
 
         return self.apply_loss(advantage, target_advantage, log_probabilities)
-
-    def apply_loss(self, advantage, target_advantage, log_probabilities):
-        actor_loss = (log_probabilities * abs(advantage - target_advantage)).sum()
-        critic_loss = self.criterion(advantage, target_advantage)
-        loss = actor_loss + (critic_loss * self.critic_loss_weight)
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        if self.lr_scheduler:
-            self.lr_scheduler.step()
-        return loss.item()

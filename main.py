@@ -173,21 +173,34 @@ def main():
     env = waterworld.env(**args.to_dict())
 
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
+    num_actions = env.action_space(env.possible_agents[0]).shape[0]
     num_sensors = args.n_sensors
     # Create agents
-    policy_networks = []
-    for _ in range(2):
-        network = generate_qnn_distance(num_sensors)
-        # network = generate_simple_linear_256_64_3(num_obs)
-        network += torch.nn.LogSoftmax(dim=-1)
-        policy_networks.append(network)
+    shared_network = generate_qnn_distance(num_sensors)
+    advantage_network = NeuralNetwork(
+        layers=[
+            torch.nn.Linear(shared_network.out_features, 64),
+            torch.nn.ReLU(),
+            torch.nn.Linear(64, 1),
+        ]
+    )
+    policy_networks = [
+        NeuralNetwork(
+            layers=[
+                torch.nn.Linear(shared_network.out_features, 64),
+                torch.nn.ReLU(),
+                torch.nn.Linear(64, 5),
+            ]
+        )
+        for _ in range(num_actions)
+    ]
 
     pursuer_0 = A2CAgent(
         env,
         "pursuer_0",
         name=agent_name,
-        shared_network=NeuralNetwork(torch.nn.Linear(num_obs, num_obs)),
-        advantage_network=NeuralNetwork(torch.nn.Linear(num_obs, 1)),
+        shared_network=shared_network,
+        advantage_network=advantage_network,
         policy_networks=policy_networks,
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 1e-3},
@@ -203,18 +216,18 @@ def main():
     # WARNING: This will exit the program
     # test_agent_effectiveness(pursuer_0, 512, BATCH_SIZE)
 
-    # pursuer_0.enable_explore = False
-    # torchinfo.summary(
-    #     pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
-    # )
-    # pursuer_0.enable_explore = True
+    pursuer_0.enable_explore = False
+    torchinfo.summary(
+        pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
+    )
+    pursuer_0.enable_explore = True
 
     pursuer_1 = A2CAgent(
         env,
         "pursuer_1",
         name=agent_name,
-        shared_network=NeuralNetwork(torch.nn.Linear(num_obs, num_obs)),
-        advantage_network=NeuralNetwork(torch.nn.Linear(num_obs, 1)),
+        shared_network=shared_network,
+        advantage_network=advantage_network,
         policy_networks=policy_networks,
         optimizer_factory=torch.optim.Adam,
         optimizer_kwargs={"lr": 1e-3},

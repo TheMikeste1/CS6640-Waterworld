@@ -282,7 +282,7 @@ def main():
         agent_configs = (
             f"name: {agent.name},\n"
             f"batch_size: {agent.batch_size},\n"
-            f"memory: {len(agent.memory)},\n"
+            f"memory: {agent.memory.max_size},\n"
             f"gamma: {agent.gamma},\n"
             f"optimizer: {agent.optimizer},\n"
             f"criterion: {agent.criterion},\n"

@@ -261,12 +261,16 @@ def main():
         # agent.enable_explore = False
         # tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
         # agent.enable_explore = was_exploring
-        tensorboard_writer.add_text(f"{env_name}/name", agent.name)
-        tensorboard_writer.add_text(f"{env_name}/batch_size", str(agent.batch_size))
-        tensorboard_writer.add_text(f"{env_name}/memory", str(len(agent.memory)))
-        tensorboard_writer.add_text(f"{env_name}/optimizer", str(agent.optimizer))
-        tensorboard_writer.add_text(f"{env_name}/criterion", str(agent.criterion))
-        tensorboard_writer.add_text(f"{env_name}/lr_scheduler", str(agent.lr_scheduler))
+        agent_configs = (
+            f"name: {agent.name},\n"
+            f"batch_size: {agent.batch_size},\n"
+            f"memory: {len(agent.memory)},\n"
+            f"gamma: {agent.gamma},\n"
+            f"optimizer: {agent.optimizer},\n"
+            f"criterion: {agent.criterion},\n"
+            f"lr_schedule: {agent.lr_scheduler},\n"
+        )
+        tensorboard_writer.add_text(f"{env_name}/config", agent_configs)
 
     try:
         train(

@@ -160,9 +160,9 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 512
+    ITERATIONS = 2048
     BATCH_SIZE = 1024
-    agent_name = "a2c_distance_with_softmax"
+    agent_name = "a2c_distance"
     args = WaterworldArguments(
         # FPS=60
         render_mode=WaterworldArguments.RenderMode.NONE,
@@ -176,11 +176,39 @@ def main():
     num_actions = env.action_space(env.possible_agents[0]).shape[0]
     num_sensors = args.n_sensors
     # Create agents
-    shared_network = generate_qnn_distance(num_sensors)
+    shared_network = DistanceNeuralNetwork(
+        layers=[
+            # out_channels * num_sensors + 2 collision features + 3 speed layers
+            torch.nn.Linear(64 * num_sensors + 2 + num_sensors * 3, 256),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(256, 256),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(256, 64),
+        ],
+        distance_layers=[
+            torch.nn.BatchNorm1d(5),
+            torch.nn.Conv1d(
+                in_channels=5,
+                out_channels=32,
+                kernel_size=3,
+                padding=1,
+            ),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv1d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=3,
+                padding=1,
+            ),
+            torch.nn.BatchNorm1d(64),
+        ],
+        speed_features=True,
+        num_sensors=num_sensors,
+    )
     advantage_network = NeuralNetwork(
         layers=[
             torch.nn.Linear(shared_network.out_features, 64),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear(64, 1),
         ]
     )
@@ -188,7 +216,7 @@ def main():
         NeuralNetwork(
             layers=[
                 torch.nn.Linear(shared_network.out_features, 64),
-                torch.nn.ReLU(),
+                torch.nn.LeakyReLU(),
                 torch.nn.Linear(64, 5),
             ]
         )
@@ -222,11 +250,39 @@ def main():
     )
     pursuer_0.enable_explore = True
 
-    shared_network = generate_qnn_distance(num_sensors)
+    shared_network = DistanceNeuralNetwork(
+        layers=[
+            # out_channels * num_sensors + 2 collision features + 3 speed layers
+            torch.nn.Linear(64 * num_sensors + 2 + num_sensors * 3, 256),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(256, 256),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(256, 64),
+        ],
+        distance_layers=[
+            torch.nn.BatchNorm1d(5),
+            torch.nn.Conv1d(
+                in_channels=5,
+                out_channels=32,
+                kernel_size=3,
+                padding=1,
+            ),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv1d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=3,
+                padding=1,
+            ),
+            torch.nn.BatchNorm1d(64),
+        ],
+        speed_features=True,
+        num_sensors=num_sensors,
+    )
     advantage_network = NeuralNetwork(
         layers=[
             torch.nn.Linear(shared_network.out_features, 64),
-            torch.nn.ReLU(),
+            torch.nn.LeakyReLU(),
             torch.nn.Linear(64, 1),
         ]
     )
@@ -234,8 +290,8 @@ def main():
         NeuralNetwork(
             layers=[
                 torch.nn.Linear(shared_network.out_features, 64),
-                torch.nn.ReLU(),
-                torch.nn.Linear(64, 5),
+                torch.nn.LeakyReLU(),
+                torch.nn.Linear(64, 10),
             ]
         )
         for _ in range(num_actions)
@@ -248,7 +304,7 @@ def main():
         advantage_network=advantage_network,
         policy_networks=policy_networks,
         optimizer_factory=torch.optim.Adam,
-        optimizer_kwargs={"lr": 1e-3},
+        optimizer_kwargs={"lr": 3e-3},
         criterion_factory=torch.nn.HuberLoss,
         criterion_kwargs={"reduction": "mean"},
         lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,

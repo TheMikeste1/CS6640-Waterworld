@@ -1,9 +1,46 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, Iterable, Union
+
 import torch
 
-from agents import NeuralNetwork
+from agents import ModuleBuilder, NeuralNetwork
 
 
 class DistanceNeuralNetwork(NeuralNetwork):
+    @dataclass(kw_only=True)
+    class Builder:
+        distance_layers: Union[
+            Iterable[ModuleBuilder | Callable[[], torch.nn.Module]],
+            ModuleBuilder,
+            Callable[[], torch.nn.Module],
+        ]
+        layers: Union[
+            Iterable[ModuleBuilder | Callable[[], torch.nn.Module]],
+            ModuleBuilder,
+            Callable[[], torch.nn.Module],
+        ]
+        num_sensors: int
+        has_speed_features: bool = True
+
+        def build(self) -> DistanceNeuralNetwork:
+            if isinstance(self.layers, Iterable):
+                layers = [layer() for layer in self.layers]
+            else:
+                layers = self.layers()
+
+            if isinstance(self.distance_layers, Iterable):
+                distance_layers = [layer() for layer in self.distance_layers]
+            else:
+                distance_layers = self.distance_layers()
+            return DistanceNeuralNetwork(
+                distance_layers=distance_layers,
+                layers=layers,
+                num_sensors=self.num_sensors,
+                speed_features=self.has_speed_features,
+            )
+
     def __init__(
         self,
         layers: [torch.nn.Module],

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, TYPE_CHECKING, Union
+from typing import Any, Callable, Collection, Iterable, TYPE_CHECKING, Union
 
 import numpy as np
 import torch
@@ -24,7 +24,7 @@ class A2CAgent(AbstractAgent):
     class Builder(AbstractAgent.Builder):
         shared_network: NeuralNetwork.Builder
         advantage_network: NeuralNetwork.Builder
-        policy_networks: [NeuralNetwork.Builder]
+        policy_networks: [NeuralNetwork.Builder] | NeuralNetwork.Builder
         optimizer_factory: Callable[
             [Iterable[torch.Tensor], ...], torch.optim.Optimizer
         ]
@@ -48,9 +48,19 @@ class A2CAgent(AbstractAgent):
             kwargs["env"] = env
             kwargs["shared_network"] = self.shared_network.build()
             kwargs["advantage_network"] = self.advantage_network.build()
-            kwargs["policy_networks"] = [
-                builder.build() for builder in self.policy_networks
-            ]
+            num_actions = env.action_space(self.env_name).shape[0]
+            if isinstance(self.policy_networks, Collection):
+                assert len(self.policy_networks) == num_actions, (
+                    f"Number of policy networks ({len(self.policy_networks)}) "
+                    f"must match number of actions ({num_actions})."
+                )
+                kwargs["policy_networks"] = [
+                    builder.build() for builder in self.policy_networks
+                ]
+            else:
+                kwargs["policy_networks"] = [
+                    self.policy_networks.build() for _ in range(num_actions)
+                ]
             return A2CAgent(**kwargs)
 
     __slots__ = (

@@ -29,6 +29,7 @@ class Runner:
         "on_post_train",
         "on_render",
         "should_render_empty",
+        "tqdm_kwargs",
     )
 
     def __init__(
@@ -37,6 +38,7 @@ class Runner:
         agents: Dict[str, AbstractAgent],
         should_render_empty: bool = False,
         enable_tqdm: bool = True,
+        tqdm_kwargs: dict = None,
     ):
         if not isinstance(env, pz.utils.BaseWrapper):
             # Wrap the environment so we can use .unwrap without warnings
@@ -72,6 +74,7 @@ class Runner:
 
         self.should_render_empty = should_render_empty
         self.enable_tqdm = enable_tqdm
+        self.tqdm_kwargs = tqdm_kwargs or {}
 
     def _on_finished_iterations(self):
         self.on_finished_iterations(self)
@@ -174,7 +177,7 @@ class Runner:
     def run_iterations(self, iterations: int, train: bool = True):
         bar = range(iterations)
         if self.enable_tqdm:
-            bar = tqdm(bar)
+            bar = tqdm(bar, **self.tqdm_kwargs)
         for i in bar:
             rewards = self.run_episode(train)
             self._on_post_episode(i, rewards)

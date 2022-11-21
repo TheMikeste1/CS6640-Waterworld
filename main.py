@@ -157,8 +157,8 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 2048
-    BATCH_SIZE = 1024
+    ITERATIONS = 512
+    BATCH_SIZE = 2048
     agent_name = "a2c_distance"
     args = WaterworldArguments(
         # FPS=60
@@ -288,7 +288,9 @@ def main():
             layers=[
                 torch.nn.Linear(shared_network.out_features, 64),
                 torch.nn.LeakyReLU(),
-                torch.nn.Linear(64, 10),
+                torch.nn.Linear(64, 128),
+                torch.nn.LeakyReLU(),
+                torch.nn.Linear(128, 5),
             ]
         )
         for _ in range(num_actions)

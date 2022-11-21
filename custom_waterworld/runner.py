@@ -5,10 +5,9 @@ from typing import Any, Callable, Dict, TYPE_CHECKING
 
 import numpy as np
 import pettingzoo as pz
-import torch
 from tqdm import tqdm
 
-from agents.step_data import StepData
+from agents import StepData
 from custom_waterworld.event import Event
 
 if TYPE_CHECKING:

@@ -5,7 +5,7 @@ from typing import Any, TYPE_CHECKING
 
 import torch
 
-from agents import AbstractAgent
+from ..agents import AbstractAgent
 
 if TYPE_CHECKING:
     import pettingzoo as pz

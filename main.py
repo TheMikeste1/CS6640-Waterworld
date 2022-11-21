@@ -10,10 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import custom_waterworld
-from agents import A2CAgent, AbstractAgent, NeuralNetwork, QNNAgent
-from agents.distance_neural_network import DistanceNeuralNetwork
-from agents.do_nothing_agent import DoNothingAgent
-from agents.human_agent import HumanAgent
+from agents import A2CAgent, AbstractAgent
 from assembled_agents import *
 from custom_waterworld import Runner, WaterworldArguments
 

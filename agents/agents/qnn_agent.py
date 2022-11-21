@@ -7,12 +7,12 @@ import torch
 import numpy as np
 from torch import Tensor
 
-from agents import AbstractAgent
+from ..agents import AbstractAgent
 from agents.memory import Memory
 
 if TYPE_CHECKING:
     import pettingzoo as pz
-    from agents.step_data import StepData
+    from agents import StepData
     from agents.neural_network import NeuralNetwork
 
     # noinspection PyUnresolvedReferences,PyProtectedMember

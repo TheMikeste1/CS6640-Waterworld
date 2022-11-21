@@ -6,10 +6,11 @@ from typing import Any, TYPE_CHECKING
 
 import torch
 
-from agents.step_data import StepData
 
 if TYPE_CHECKING:
     import pettingzoo as pz
+
+    from agents import StepData
 
 
 class AbstractAgent(ABC, torch.nn.Module):

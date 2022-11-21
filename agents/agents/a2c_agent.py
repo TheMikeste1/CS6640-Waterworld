@@ -6,14 +6,14 @@ from typing import Any, Callable, Iterable, TYPE_CHECKING, Union
 import numpy as np
 import torch
 
-from agents import AbstractAgent
-from agents.memory import Memory
+from ..agents import AbstractAgent
+from agents import Memory
 
 if TYPE_CHECKING:
     import pettingzoo as pz
 
     from agents import NeuralNetwork
-    from agents.step_data import StepData
+    from agents import StepData
 
     # noinspection PyUnresolvedReferences,PyProtectedMember
     AbstractLRScheduler = torch.optim.lr_scheduler._LRScheduler

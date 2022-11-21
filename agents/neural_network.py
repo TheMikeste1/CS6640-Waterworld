@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Callable, Iterable, TYPE_CHECKING, Union
 
@@ -67,7 +68,8 @@ class NeuralNetwork(torch.nn.Module):
         else:
             raise ValueError("No layer with out_features or out_channels found")
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, *args) -> torch.Tensor:
+        x = args[0]
         x = self.layers(x)
         return x
 
@@ -85,3 +87,7 @@ class NeuralNetwork(torch.nn.Module):
 
     def __getitem__(self, item):
         return self.layers[item]
+
+    def clone(self):
+        layers = list(copy.deepcopy(self.layers))
+        return NeuralNetwork(layers)

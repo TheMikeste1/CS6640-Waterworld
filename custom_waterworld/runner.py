@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, TYPE_CHECKING
 
 import numpy as np
 import pettingzoo as pz
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from agents import StepData
 from custom_waterworld.event import Event

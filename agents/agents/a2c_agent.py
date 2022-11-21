@@ -190,7 +190,10 @@ class A2CAgent(AbstractAgent):
         actions_to_take = categories.sample()
         probabilities = categories.log_prob(actions_to_take)
         actions = self._action_to_action_values(actions_to_take)
-        return actions, probabilities
+        return (
+            actions,
+            probabilities,
+        )  # Maybe add probabilities as a histogram to tensorboard?
 
     def _action_to_action_values(self, action: torch.Tensor) -> torch.Tensor:
         action_space = self.env.action_space(self.env_name)
@@ -227,7 +230,7 @@ class A2CAgent(AbstractAgent):
         # Calculate the advantage
         advantage = target_value - value
         # https://medium.com/deeplearningmadeeasy/advantage-actor-critic-a2c-implementation-944e98616b#336b
-        actor_loss = (-log_probabilities * advantage.detach()).sum()
+        actor_loss = (-log_probabilities * advantage.detach()).mean()
 
         loss = actor_loss + (critic_loss * self.critic_loss_weight)
         self.optimizer.zero_grad()
@@ -301,7 +304,7 @@ class A2CAgent(AbstractAgent):
         )
 
         return {
-            "loss": total_loss / batch_size,
-            "critic_loss": critic_loss / batch_size,
-            "actor_loss": actor_loss / batch_size,
+            "loss": total_loss,
+            "critic_loss": critic_loss,
+            "actor_loss": actor_loss,
         }

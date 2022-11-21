@@ -235,7 +235,7 @@ class A2CAgent(AbstractAgent):
         self.optimizer.step()
         if self.lr_scheduler:
             self.lr_scheduler.step()
-        return loss.item()
+        return loss.item(), actor_loss.item(), critic_loss.item()
 
     def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         shared_out = self.shared_network(x)
@@ -296,12 +296,12 @@ class A2CAgent(AbstractAgent):
         _, value = self.forward(state)
         _, next_value = self.forward(new_state)
 
-        total_loss, critic_loss, actor_loss = self.apply_loss(
+        total_loss, actor_loss, critic_loss = self.apply_loss(
             value, next_value, reward, log_probabilities
         )
 
         return {
-            "loss": total_loss,
-            "critic_loss": critic_loss,
-            "actor_loss": actor_loss,
+            "loss": total_loss / batch_size,
+            "critic_loss": critic_loss / batch_size,
+            "actor_loss": actor_loss / batch_size,
         }

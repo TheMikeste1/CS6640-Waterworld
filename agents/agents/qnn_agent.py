@@ -237,7 +237,7 @@ class QNNAgent(AbstractAgent):
         # Calculate loss
         loss = self.apply_loss(old_policy_targets, new_policy_targets)
         return {
-            "loss": loss,
+            "loss": loss / batch_size,
         }
 
     def apply_loss(

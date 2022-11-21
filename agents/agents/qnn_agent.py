@@ -1,16 +1,18 @@
 from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Any, Callable, Iterable, TYPE_CHECKING, Union
 
 import torch
 import numpy as np
 from torch import Tensor
 
-from agents import AbstractAgent
+from ..agents import AbstractAgent
 from agents.memory import Memory
 
 if TYPE_CHECKING:
     import pettingzoo as pz
-    from agents.step_data import StepData
+    from agents import StepData
     from agents.neural_network import NeuralNetwork
 
     # noinspection PyUnresolvedReferences,PyProtectedMember
@@ -18,6 +20,35 @@ if TYPE_CHECKING:
 
 
 class QNNAgent(AbstractAgent):
+    @dataclass(kw_only=True)
+    class Builder(AbstractAgent.Builder):
+        policy_networks: [NeuralNetwork.Builder]
+        optimizer_factory: Callable[
+            [Iterable[torch.Tensor], ...], torch.optim.Optimizer
+        ]
+        criterion_factory: Union[
+            Callable[[...], torch.nn.Module], Callable[[...], torch.Tensor]
+        ]
+        lr_scheduler_factory: Callable[
+            [torch.optim.Optimizer, ...], AbstractLRScheduler
+        ] | None = None
+        optimizer_kwargs: dict = None
+        criterion_kwargs: dict = None
+        lr_scheduler_kwargs: dict = None
+        device: str | torch.device = None
+        memory: Memory | int = None
+        batch_size: int = 1
+        gamma: float = 0.99
+        epsilon: float = 0.1
+
+        def build(self, env: pz.AECEnv) -> QNNAgent:
+            kwargs = self.__dict__.copy()
+            kwargs["env"] = env
+            kwargs["policy_networks"] = [
+                builder.build() for builder in self.policy_networks
+            ]
+            return QNNAgent(**kwargs)
+
     __slots__ = (
         "batch_size",
         "criterion",
@@ -28,14 +59,14 @@ class QNNAgent(AbstractAgent):
         "enable_explore",
         "epsilon",
         "memory",
-        "policy_models",
+        "policy_networks",
     )
 
     def __init__(
         self,
         env: pz.AECEnv,
         env_name: str,
-        policy_models: [NeuralNetwork],
+        policy_networks: [NeuralNetwork],
         optimizer_factory: Callable[[Iterable[Tensor], ...], torch.optim.Optimizer],
         criterion_factory: Union[
             Callable[[...], torch.nn.Module], Callable[[...], torch.Tensor]
@@ -59,12 +90,12 @@ class QNNAgent(AbstractAgent):
                 "lr_scheduler_kwargs cannot be specified without lr_scheduler_factory"
             )
 
-        # Assert there are the same number of policy_models as actions
+        # Assert there are the same number of policy_networks as actions
         assert (
-            len(policy_models) == env.action_space(env.possible_agents[0]).shape[0]
+            len(policy_networks) == env.action_space(env.possible_agents[0]).shape[0]
         ), "There must be a policy_model for each action"
 
-        self.policy_models = torch.nn.ModuleList(policy_models)
+        self.policy_networks = torch.nn.ModuleList(policy_networks)
 
         self.optimizer = optimizer_factory(
             self.parameters(), **(optimizer_kwargs or {})
@@ -126,13 +157,13 @@ class QNNAgent(AbstractAgent):
         return np.array(
             [
                 np.random.randint(0, pm.out_features, size=num_actions)
-                for pm in self.policy_models
+                for pm in self.policy_networks
             ],
             dtype=np.long,
         ).T
 
     def _calculate_step_size(self, action_space):
-        out_features = np.array([pm.out_features for pm in self.policy_models])
+        out_features = np.array([pm.out_features for pm in self.policy_networks])
         # out_features - 1 because the zeroth feature will give us the low.
         # For example, if we have 10 out features, the 0th feature will give us the low,
         # and the 9th feature will give us the high.
@@ -141,7 +172,7 @@ class QNNAgent(AbstractAgent):
 
     def _call_policies(self, value: torch.Tensor) -> torch.Tensor:
         # Concatenates the output of each policy model
-        policy_outs = [pm(value) for pm in self.policy_models]
+        policy_outs = [pm(value) for pm in self.policy_networks]
         return torch.cat(policy_outs, dim=-2)
 
     def forward(self, x) -> torch.Tensor:
@@ -167,14 +198,14 @@ class QNNAgent(AbstractAgent):
 
     @property
     def in_features(self):
-        return self.policy_models[0].in_features
+        return self.policy_networks[0].in_features
 
     def on_train(self):
         return self.update(self.batch_size)
 
     @property
     def out_features(self):
-        return self.policy_models[0].out_features
+        return self.policy_networks[0].out_features
 
     def post_step(self, data: StepData):
         agent_info = data.agent_info

@@ -1,24 +1,41 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Callable, Iterable, TYPE_CHECKING, Union
 
 import torch
+
+from agents.module_builder import ModuleBuilder
 
 if TYPE_CHECKING:
     from torch import Tensor
 
 
 class NeuralNetwork(torch.nn.Module):
+    @dataclass
+    class Builder:
+        layers: Union[
+            Iterable[ModuleBuilder | Callable[[], torch.nn.Module]],
+            ModuleBuilder,
+            Callable[[], torch.nn.Module],
+        ]
+
+        def build(self) -> NeuralNetwork:
+            if isinstance(self.layers, Iterable):
+                layers = [layer() for layer in self.layers]
+            else:
+                layers = self.layers()
+            return NeuralNetwork(layers)
+
     __slots__ = (
-        "criterion",
+        "__num_inputs",
+        "__num_outputs",
         "layers",
-        "lr_scheduler",
-        "optimizer",
     )
 
     def __init__(
         self,
-        layers: [torch.nn.Module] | torch.nn.Module,
+        layers: Iterable[torch.nn.Module] | torch.nn.Module,
     ):
         super().__init__()
         if isinstance(layers, torch.nn.Module):

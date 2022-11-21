@@ -3,7 +3,7 @@ from typing import Any
 import pygame
 import torch
 
-from agents import AbstractAgent
+from ..agents import AbstractAgent
 
 
 class HumanAgent(AbstractAgent):

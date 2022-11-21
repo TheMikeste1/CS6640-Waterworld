@@ -1,9 +1,8 @@
 from typing import Any
 
-import numpy as np
 import torch
 
-from agents import AbstractAgent
+from ..agents import AbstractAgent
 
 
 class DoNothingAgent(AbstractAgent):

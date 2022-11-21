@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Any, Callable, Iterable, TYPE_CHECKING, Union
 
 import numpy as np
@@ -18,6 +20,39 @@ if TYPE_CHECKING:
 
 
 class A2CAgent(AbstractAgent):
+    @dataclass(kw_only=True)
+    class Builder(AbstractAgent.Builder):
+        shared_network: NeuralNetwork.Builder
+        advantage_network: NeuralNetwork.Builder
+        policy_networks: [NeuralNetwork.Builder]
+        optimizer_factory: Callable[
+            [Iterable[torch.Tensor], ...], torch.optim.Optimizer
+        ]
+        criterion_factory: Union[
+            Callable[[...], torch.nn.Module], Callable[[...], torch.Tensor]
+        ]
+        lr_scheduler_factory: Callable[
+            [torch.optim.Optimizer, ...], AbstractLRScheduler
+        ] | None = None
+        optimizer_kwargs: dict = None
+        criterion_kwargs: dict = None
+        lr_scheduler_kwargs: dict = None
+        device: str | torch.device = None
+        memory: Memory | int = None
+        batch_size: int = 1
+        gamma: float = 0.99
+        critic_loss_weight: float = 0.5
+
+        def build(self, env: pz.AECEnv) -> A2CAgent:
+            kwargs = self.__dict__.copy()
+            kwargs["env"] = env
+            kwargs["shared_network"] = self.shared_network.build()
+            kwargs["advantage_network"] = self.advantage_network.build()
+            kwargs["policy_networks"] = [
+                builder.build() for builder in self.policy_networks
+            ]
+            return A2CAgent(**kwargs)
+
     __slots__ = (
         "advantage_network",
         "batch_size",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 import torch
@@ -8,11 +9,19 @@ import torch
 from agents.step_data import StepData
 
 if TYPE_CHECKING:
-    import numpy as np
     import pettingzoo as pz
 
 
 class AbstractAgent(ABC, torch.nn.Module):
+    @dataclass(kw_only=True)
+    class Builder(ABC):
+        env_name: str
+        name: str
+
+        @abstractmethod
+        def build(self, env: pz.AECEnv) -> AbstractAgent:
+            pass
+
     __slots__ = ("env", "env_name", "name")
 
     def __init__(self, env: pz.AECEnv, env_name: str, name: str):
@@ -46,9 +55,12 @@ class AbstractAgent(ABC, torch.nn.Module):
     def update(self, batch_size: int):
         pass
 
-    def apply_loss(self, *args,  **kwargs):
+    def apply_loss(self, *args, **kwargs):
         pass
 
     def to(self, *args, **kwargs):
         self.device = args[0]
         return super().to(*args, **kwargs)
+
+
+AgentBuilder = AbstractAgent.Builder

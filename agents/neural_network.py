@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
@@ -9,6 +10,13 @@ if TYPE_CHECKING:
 
 
 class NeuralNetwork(torch.nn.Module):
+    @dataclass(kw_only=True)
+    class Builder:
+        layers: [torch.nn.Module] | torch.nn.Module
+
+        def build(self) -> NeuralNetwork:
+            return NeuralNetwork(self.layers)
+
     __slots__ = (
         "criterion",
         "layers",

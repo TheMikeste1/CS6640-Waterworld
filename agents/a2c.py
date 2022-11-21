@@ -166,9 +166,24 @@ class A2CAgent(AbstractAgent):
         policy_outs = [pm(value) for pm in self.policy_networks]
         return torch.cat(policy_outs, dim=-2)
 
-    def apply_loss(self, advantage, target_advantage, log_probabilities):
-        actor_loss = (log_probabilities * abs(advantage - target_advantage)).sum()
-        critic_loss = self.criterion(advantage, target_advantage)
+    def apply_loss(
+        self,
+        value: torch.Tensor,
+        next_value: torch.Tensor,
+        reward: torch.Tensor,
+        log_probabilities: torch.Tensor,
+    ):
+        # https://medium.com/deeplearningmadeeasy/advantage-actor-critic-a2c-implementation-944e98616b#1384
+        target_value = (reward + self.gamma * next_value).to(
+            device=self.device, dtype=value.dtype
+        )
+        critic_loss = self.criterion(value, target_value)
+
+        # Calculate the advantage
+        advantage = target_value - value
+        # https://medium.com/deeplearningmadeeasy/advantage-actor-critic-a2c-implementation-944e98616b#336b
+        actor_loss = (-log_probabilities * advantage.detach()).sum()
+
         loss = actor_loss + (critic_loss * self.critic_loss_weight)
         self.optimizer.zero_grad()
         loss.backward()
@@ -233,8 +248,7 @@ class A2CAgent(AbstractAgent):
         new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(1)
         log_probabilities = torch.from_numpy(log_probabilities).to(self.device)
 
-        _, advantage = self.forward(state)
-        _, new_advantage = self.forward(new_state)
-        target_advantage = (reward + self.gamma * new_advantage).to(advantage.dtype)
+        _, value = self.forward(state)
+        _, next_value = self.forward(new_state)
 
-        return self.apply_loss(advantage, target_advantage, log_probabilities)
+        return self.apply_loss(value, next_value, reward, log_probabilities)

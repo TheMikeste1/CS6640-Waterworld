@@ -165,7 +165,7 @@ class A2CAgent(AbstractAgent):
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = device
-        self.to(self.device, dtype=torch.float64)
+        self.to(self.device)
 
     def __call__(self, obs) -> (torch.Tensor, Any):
         if isinstance(obs, np.ndarray):
@@ -173,7 +173,7 @@ class A2CAgent(AbstractAgent):
         # If obs is not in batch form, add a batch dimension
         while len(obs.shape) < 3:
             obs = obs.unsqueeze(-2)
-        obs = obs.to(self.device, dtype=torch.float64)
+        obs = obs.to(self.device)
         action_probs, _ = torch.nn.Module.__call__(self, obs)
 
         categories = torch.distributions.Categorical(action_probs)
@@ -184,11 +184,9 @@ class A2CAgent(AbstractAgent):
 
     def _action_to_action_values(self, action: torch.Tensor) -> torch.Tensor:
         action_space = self.env.action_space(self.env_name)
-        step_sizes = self._calculate_step_size(action_space).to(
-            self.device, dtype=torch.float64
-        )
-        low = torch.tensor(action_space.low).to(self.device, dtype=torch.float64)
-        return (action * step_sizes + low).to(torch.float64)
+        step_sizes = self._calculate_step_size(action_space).to(self.device)
+        low = torch.tensor(action_space.low).to(self.device)
+        return (action * step_sizes + low).to(torch.float32)
 
     def _calculate_step_size(self, action_space):
         out_features = torch.tensor([pm.out_features for pm in self.policy_networks])
@@ -280,23 +278,10 @@ class A2CAgent(AbstractAgent):
         state, _, reward, new_state, _, log_probabilities = self.memory.sample(
             batch_size
         )
-        state = (
-            torch.from_numpy(state).to(self.device, dtype=torch.float64).unsqueeze(1)
-        )
-        reward = (
-            torch.from_numpy(reward)
-            .to(self.device, dtype=torch.float64)
-            .unsqueeze(1)
-            .unsqueeze(1)
-        )
-        new_state = (
-            torch.from_numpy(new_state)
-            .to(self.device, dtype=torch.float64)
-            .unsqueeze(1)
-        )
-        log_probabilities = torch.from_numpy(log_probabilities).to(
-            self.device, dtype=torch.float64
-        )
+        state = torch.from_numpy(state).to(self.device).unsqueeze(1)
+        reward = torch.from_numpy(reward).to(self.device).unsqueeze(1).unsqueeze(1)
+        new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(1)
+        log_probabilities = torch.from_numpy(log_probabilities).to(self.device)
 
         _, value = self.forward(state)
         _, next_value = self.forward(new_state)

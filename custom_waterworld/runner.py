@@ -146,7 +146,7 @@ class Runner:
             action = action.squeeze()  # Remove any extra dimensions
 
             # If the agent is dead or truncated the only allowed action is None
-            env.step(None if terminated or truncated else action.astype(np.float32))
+            env.step(None if terminated or truncated else action)
             # Cache the data for updates later
             cached_data[agent_name] = {
                 "state": obs,

@@ -1,3 +1,4 @@
+from a2c_agent import A2CAgent
 from agents.abstact_agent import AbstractAgent, AgentBuilder
 from agents.random_agent import RandomAgent
 from agents.qnn_agent import QNNAgent

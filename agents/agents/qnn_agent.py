@@ -235,7 +235,10 @@ class QNNAgent(AbstractAgent):
         new_policy_targets = self.get_new_policy_targets(reward, new_value)
 
         # Calculate loss
-        return self.apply_loss(old_policy_targets, new_policy_targets)
+        loss = self.apply_loss(old_policy_targets, new_policy_targets)
+        return {
+            "loss": loss,
+        }
 
     def apply_loss(
         self, old_policy_targets: torch.Tensor, new_policy_targets: torch.Tensor

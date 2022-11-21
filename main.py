@@ -25,7 +25,8 @@ def on_post_episode(writer: SummaryWriter, runner, it, rewards, agent_posts):
 def on_post_train(writer: SummaryWriter, runner, it, agent_trains):
     for agent_name in agent_trains.keys():
         loss = agent_trains[agent_name]
-        writer.add_scalar(f"{agent_name}/loss", loss, it)
+        for key, value in loss.items():
+            writer.add_scalar(f"{agent_name}/{key}", value, it)
 
 
 def record_episode(runner: Runner, record_name: str):

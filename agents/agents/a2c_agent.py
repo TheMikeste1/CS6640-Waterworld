@@ -286,4 +286,12 @@ class A2CAgent(AbstractAgent):
         _, value = self.forward(state)
         _, next_value = self.forward(new_state)
 
-        return self.apply_loss(value, next_value, reward, log_probabilities)
+        total_loss, critic_loss, actor_loss = self.apply_loss(
+            value, next_value, reward, log_probabilities
+        )
+
+        return {
+            "loss": total_loss,
+            "critic_loss": critic_loss,
+            "actor_loss": actor_loss,
+        }

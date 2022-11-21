@@ -196,7 +196,7 @@ class A2CAgent(AbstractAgent):
         shared_out = self.shared_network(x)
         advantage = self.advantage_network(shared_out)
         policy_out = self._call_policies(shared_out)
-        policy_out = torch.nn.functional.log_softmax(policy_out, dim=-2)
+        policy_out = torch.nn.functional.log_softmax(policy_out, dim=-1)
         return policy_out, advantage
 
     def get_possible_steps(self):

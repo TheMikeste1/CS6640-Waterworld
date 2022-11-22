@@ -133,6 +133,7 @@ class DDPGAgent(AbstractAgent):
         # /DDPG.py#L80
         if self.should_explore:
             actions = actions + self.explore_distribution.sample().to(self.device) * 0.1
+        actions = torch.clamp(actions, -1, 1)
         return actions, None
 
     def _update_targets(self):

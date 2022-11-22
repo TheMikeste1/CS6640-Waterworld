@@ -21,6 +21,45 @@ if TYPE_CHECKING:
 
 
 class DDPGAgent(AbstractAgent):
+    @dataclass(kw_only=True)
+    class Builder(AbstractAgent.Builder):
+        actor: NeuralNetwork.Builder
+        critic: CriticNetwork.Builder
+        actor_optimizer_factory: Callable[
+            [Iterable[torch.Tensor], ...], torch.optim.Optimizer
+        ]
+        critic_optimizer_factory: Callable[
+            [Iterable[torch.Tensor], ...], torch.optim.Optimizer
+        ]
+        criterion_factory: Union[
+            Callable[[...], torch.nn.Module], Callable[[...], torch.Tensor]
+        ]
+        actor_lr_scheduler_factory: Callable[
+            [torch.optim.Optimizer, ...], AbstractLRScheduler
+        ] = None
+        critic_lr_scheduler_factory: Callable[
+            [torch.optim.Optimizer, ...], AbstractLRScheduler
+        ] = None
+        actor_optimizer_kwargs: dict = None
+        actor_lr_scheduler_kwargs: dict = None
+        critic_optimizer_kwargs: dict = None
+        critic_lr_scheduler_kwargs: dict = None
+        criterion_kwargs: dict = None
+        device: str | torch.device = None
+        memory: Memory | int = None
+        batch_size: int = 1
+        gamma: float = 0.99
+        rho: float = 0.001
+        should_explore: bool = True
+        explore_distribution: torch.distributions.Distribution = None
+
+        def build(self, env: pz.AECEnv) -> DDPGAgent:
+            kwargs = self.__dict__.copy()
+            kwargs["env"] = env
+            kwargs["actor"] = self.actor.build()
+            kwargs["critic"] = self.critic.build()
+            return DDPGAgent(**kwargs)
+
     def __init__(
         self,
         env: pz.AECEnv,

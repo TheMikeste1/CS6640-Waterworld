@@ -15,6 +15,8 @@ from run_arguments import RunArguments
 def run(args: tuple) -> None:
     run_args: RunArguments = args[0]
     run_id: int = args[1]
+    prepend: str = args[2]
+
     env = waterworld.env(**run_args.environment_args.to_dict())
     agents = run_args.compile_agents(env)
     runner = Runner(
@@ -24,10 +26,9 @@ def run(args: tuple) -> None:
         tqdm_kwargs={"desc": f"Run {run_id}", "position": 1, "leave": True},
     )
 
-    date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     tensorboard_writer: SummaryWriter | None = None
     tensorboard_writer = SummaryWriter(
-        log_dir=f"runs/{date_time}/{run_args.run_name}_{run_args.num_episodes}its"
+        log_dir=f"runs/{prepend}{run_args.run_name}_{run_args.num_episodes}its"
     )
     for env_name, agent in agents.items():
         agent_configs = (
@@ -45,7 +46,7 @@ def run(args: tuple) -> None:
         train(
             runner,
             run_args.num_episodes,
-            name_prepend=date_time,
+            name_prepend=prepend,
             tensorboard_writer=tensorboard_writer,
             verbose=False,
         )
@@ -58,7 +59,7 @@ def run(args: tuple) -> None:
             record_episode(
                 runner,
                 record_name=f"recordings/"
-                f"{date_time}/{run_args.run_name}_"
+                f"{prepend}{run_args.run_name}_"
                 f"{run_args.num_episodes}its",
             )
     finally:
@@ -277,8 +278,9 @@ def main():
         args = run_builder.build()
         run_args.append(args)
 
+    prepend = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     NUM_PROCESSES = min(NUM_PROCESSES, len(run_args))
-    enumerated_args = [(r, i + 1) for i, r in enumerate(run_args)]
+    enumerated_args = [(r, i + 1, prepend) for i, r in enumerate(run_args)]
     multiprocessing.freeze_support()
     print(f"Starting {len(run_args)} runs with {NUM_PROCESSES} processes")
     process_map(run, enumerated_args, max_workers=NUM_PROCESSES, position=0)

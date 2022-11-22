@@ -4,7 +4,7 @@ from typing import Any, Callable
 import torch
 
 
-@dataclass(kw_only=True)
+@dataclass
 class ModuleBuilder:
     factory: Callable[[...], torch.nn.Module]
     kwargs: dict[str, Any] = field(default_factory=dict)

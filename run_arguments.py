@@ -4,9 +4,10 @@ from typing import Iterable, List, Sized, TYPE_CHECKING
 
 from dataclasses import dataclass, field
 
+from custom_waterworld import WaterworldArguments
+
 if TYPE_CHECKING:
     from agents import AgentBuilder
-    from custom_waterworld import WaterworldArguments
 
 
 @dataclass(kw_only=True, slots=True)

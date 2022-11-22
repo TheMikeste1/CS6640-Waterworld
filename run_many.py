@@ -6,7 +6,7 @@ from pettingzoo.sisl import waterworld_v4 as waterworld
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.contrib.concurrent import process_map
 
-from agents import A2CAgent, ModuleBuilder, NeuralNetwork
+from agents import A2CAgent, DDPGAgent, ModuleBuilder, NeuralNetwork
 from custom_waterworld import Runner, WaterworldArguments
 from main import record_episode, train
 from run_arguments import RunArguments
@@ -58,7 +58,8 @@ def run(args: tuple) -> None:
             record_episode(
                 runner,
                 record_name=f"recordings/"
-                f"{date_time}/{run_args.run_name}_{run_args.num_episodes}its",
+                            f"{date_time}/{run_args.run_name}_"
+                            f"{run_args.num_episodes}its",
             )
     finally:
         env.close()
@@ -69,686 +70,125 @@ def run(args: tuple) -> None:
 def main():
     NUM_PROCESSES = 4
 
-    num_sensors = 30
-    run_args = [
-        RunArguments(
-            run_name="a2c_distance_vs_linear_batch2048_food20",
-            num_episodes=1024,
-            environment_args=WaterworldArguments(
-                render_mode=WaterworldArguments.RenderMode.NONE,
-                max_cycles=512,
-                n_evaders=20,
-            ),
-            should_record=True,
-            agent_builders=[
-                A2CAgent.Builder(
-                    env_name="pursuer_0",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-                A2CAgent.Builder(
-                    env_name="pursuer_1",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-            ],
-        ),
-        RunArguments(
-            run_name="a2c_distance_vs_linear_batch2048_coop2_food20",
-            num_episodes=1024,
-            environment_args=WaterworldArguments(
-                render_mode=WaterworldArguments.RenderMode.NONE,
-                max_cycles=512,
-                n_evaders=20,
-                n_coop=2,
-            ),
-            should_record=True,
-            agent_builders=[
-                A2CAgent.Builder(
-                    env_name="pursuer_0",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-                A2CAgent.Builder(
-                    env_name="pursuer_1",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-            ],
-        ),
-        RunArguments(
-            run_name="a2c_distance_vs_linear_batch2048_food20_highcost",
-            num_episodes=1024,
-            environment_args=WaterworldArguments(
-                render_mode=WaterworldArguments.RenderMode.NONE,
-                max_cycles=512,
-                n_evaders=20,
-                thrust_penalty=-2.0,
-            ),
-            should_record=True,
-            agent_builders=[
-                A2CAgent.Builder(
-                    env_name="pursuer_0",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-                A2CAgent.Builder(
-                    env_name="pursuer_1",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-            ],
-        ),
-        RunArguments(
-            run_name="a2c_distance_vs_linear_batch2048_coop2_food20_highcost",
-            num_episodes=1024,
-            environment_args=WaterworldArguments(
-                render_mode=WaterworldArguments.RenderMode.NONE,
-                max_cycles=512,
-                n_evaders=20,
-                n_coop=2,
-                thrust_penalty=-2.0,
-            ),
-            should_record=True,
-            agent_builders=[
-                A2CAgent.Builder(
-                    env_name="pursuer_0",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-                A2CAgent.Builder(
-                    env_name="pursuer_1",
-                    name="a2c_linear",
-                    shared_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    # https://pettingzoo.farama.org/environments/sisl/waterworld/#observation-space
-                                    "in_features": 8 * num_sensors + 2,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 256,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 256,
-                                    "out_features": 64,
-                                },
-                            ),
-                        ],
-                    ),
-                    advantage_network=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 1,
-                                },
-                            ),
-                        ]
-                    ),
-                    policy_networks=NeuralNetwork.Builder(
-                        layers=[
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 64,
-                                },
-                            ),
-                            torch.nn.LeakyReLU,
-                            ModuleBuilder(
-                                factory=torch.nn.Linear,
-                                kwargs={
-                                    "in_features": 64,
-                                    "out_features": 5,
-                                },
-                            ),
-                        ]
-                    ),
-                    batch_size=2048,
-                    memory=2048 * 3,
-                    optimizer_factory=torch.optim.Adam,
-                    optimizer_kwargs={"lr": 0.003},
-                    criterion_factory=torch.nn.MSELoss,
-                    lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-                    lr_scheduler_kwargs={"gamma": 0.99},
-                ),
-            ],
-        ),
-    ]
+    run_args: [RunArguments] = []
+    run_builder = RunArguments.Builder()
+    run_builder.set_num_episodes(2048).set_should_record(False)
+    run_builder.set_environment_args(
+        WaterworldArguments(
+            max_cycles=256,
+        )
+    )
 
-    NUM_PROCESSES = min(NUM_PROCESSES, len(run_args))
-    run_args = [(r, i + 1) for i, r in enumerate(run_args)]
-    multiprocessing.freeze_support()
-    print(f"Starting {len(run_args)} runs with {NUM_PROCESSES} processes")
-    process_map(run, run_args, max_workers=NUM_PROCESSES, position=0)
-    print("Done")
+    for num_sensors in range(1, 31):
+        run_builder.set_run_name(f"waterworld_{num_sensors}_sensors")
+        run_builder.environment_args.n_sensors = num_sensors
+        agent_builder = A2CAgent.Builder(
+            env_name="pursuer_0",
+            name=f"A2C_{num_sensors}",
+            shared_network=NeuralNetwork.Builder(
+                layers=[
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 8 * num_sensors + 2,
+                            "out_features": (8 * num_sensors + 2) * 2,
+                        },
+                    ),
+                    torch.nn.ReLU,
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": (8 * num_sensors + 2) * 2,
+                            "out_features": 512,
+                        },
+                    ),
+                    torch.nn.ReLU,
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 512,
+                            "out_features": 512,
+                        }
+                    ),
+                ],
+            ),
+            advantage_network=NeuralNetwork.Builder(
+                layers=[
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 512,
+                            "out_features": 512,
+                        },
+                    ),
+                    torch.nn.ReLU,
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 512,
+                            "out_features": 256,
+                        },
+                    ),
+                    torch.nn.ReLU,
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 256,
+                            "out_features": 1,
+                        },
+                    ),
+                ],
+            ),
+            policy_networks=NeuralNetwork.Builder(
+                layers=[
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 512,
+                            "out_features": 512,
+                        },
+                    ),
+                    torch.nn.ReLU,
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 512,
+                            "out_features": 256,
+                        },
+                    ),
+                    torch.nn.ReLU,
+                    ModuleBuilder(
+                        torch.nn.Linear,
+                        kwargs={
+                            "in_features": 256,
+                            "out_features": 8,
+                        },
+                    ),
+                    torch.nn.Softmax,
+                ],
+            ),
+            optimizer_factory=torch.optim.Adam,
+            optimizer_kwargs={"lr": 0.0001},
+            criterion_factory=torch.nn.HuberLoss,
+            criterion_kwargs={"reduction": "mean"},
+            lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+            lr_scheduler_kwargs={"gamma": 0.999},
+            gamma=0.99,
+            batch_size=128,
+            memory=2048,
+        )
+        run_builder.add_agent_builder(agent_builder)
+        run_builder.add_agent_builder(agent_builder)
+        args = run_builder.build()
+        run_args.append(args)
 
+        NUM_PROCESSES = min(NUM_PROCESSES, len(run_args))
+        enumerated_args = [(r, i + 1) for i, r in enumerate(run_args)]
+        multiprocessing.freeze_support()
+        print(f"Starting {len(run_args)} runs with {NUM_PROCESSES} processes")
+        process_map(run, enumerated_args, max_workers=NUM_PROCESSES, position=0)
+        print("Done")
 
-if __name__ == "__main__":
-    # Run the main function
-    main()
+        if __name__ == "__main__":
+        # Run the main function
+            main()

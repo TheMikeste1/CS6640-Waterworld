@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Collection, Tuple
 
 
-@dataclass(kw_only=True, frozen=True, slots=True)
+@dataclass(kw_only=True, slots=True)
 class WaterworldArguments:
     class RenderMode(Enum):
         """Render modes for WaterWorld."""

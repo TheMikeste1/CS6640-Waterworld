@@ -2,23 +2,22 @@ from __future__ import annotations
 
 from typing import Iterable, List, Sized, TYPE_CHECKING
 
-from dataclasses import dataclass
-
+from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
     from agents import AgentBuilder
     from custom_waterworld import WaterworldArguments
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
+@dataclass(kw_only=True, slots=True)
 class RunArguments:
     @dataclass
     class Builder:
-        agent_builders: List[AgentBuilder] | AgentBuilder
-        environment_args: WaterworldArguments
-        num_episodes: int
-        run_name: str
-        should_record: bool
+        agent_builders: List[AgentBuilder] | AgentBuilder = field(default_factory=list)
+        environment_args: WaterworldArguments = WaterworldArguments()
+        num_episodes: int = 512
+        run_name: str = None
+        should_record: bool = True
 
         def add_agent_builder(
             self, agent_builder: AgentBuilder
@@ -54,6 +53,7 @@ class RunArguments:
             return self
 
         def build(self) -> RunArguments:
+            assert self.run_name is not None, "Run name must be set"
             return RunArguments(
                 agent_builders=self.agent_builders,
                 environment_args=self.environment_args,

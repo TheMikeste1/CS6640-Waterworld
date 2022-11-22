@@ -132,7 +132,7 @@ class DDPGAgent(AbstractAgent):
         # https://github.com/JL321/PolicyGradients-torch/blob/master/PolicyGradients
         # /DDPG.py#L80
         if self.should_explore:
-            actions += self.explore_distribution.sample().to(self.device) * 0.1
+            actions = actions + self.explore_distribution.sample().to(self.device) * 0.1
         return actions, None
 
     def _update_targets(self):

@@ -157,7 +157,7 @@ def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: 
 
 
 def main():
-    ITERATIONS = 512
+    ITERATIONS = 512 + 256
     BATCH_SIZE = 2048
     agent_name = "MAIN_RUN"
     args = WaterworldArguments(
@@ -175,35 +175,32 @@ def main():
     # Create agents
     actor = NeuralNetwork(
         [
-            torch.nn.Linear(num_obs, 256),
+            torch.nn.Linear(num_obs, 128),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 256),
+            torch.nn.Linear(128, 300),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, num_actions),
+            torch.nn.Linear(300, 400),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(400, num_actions),
         ]
     )
     critic = CriticNetwork(
         layers=[
-            # obs output + action output
-            torch.nn.Linear(64 + 64, 256),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 256),
+            torch.nn.Linear(256, 300),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 1),
+            torch.nn.Linear(300, 400),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(400, 1),
         ],
         obs_layers=[
-            torch.nn.Linear(num_obs, 256),
+            torch.nn.Linear(num_obs, 128),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 256),
+            torch.nn.Linear(128, 256),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 64),
         ],
         action_layers=[
             torch.nn.Linear(num_actions, 256),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 256),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 64),
         ],
     )
 
@@ -216,9 +213,13 @@ def main():
         actor_optimizer_factory=torch.optim.Adam,
         actor_optimizer_kwargs={"lr": 3e-4},
         critic_optimizer_factory=torch.optim.Adam,
-        critic_optimizer_kwargs={"lr": 3e-4},
+        critic_optimizer_kwargs={"lr": 3e-5},
         criterion_factory=torch.nn.HuberLoss,
         criterion_kwargs={"reduction": "mean"},
+        actor_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        actor_lr_scheduler_kwargs={"gamma": 0.95},
+        critic_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        critic_lr_scheduler_kwargs={"gamma": 0.999},
         batch_size=BATCH_SIZE,
         memory=BATCH_SIZE * 3,
         gamma=0.99,
@@ -233,7 +234,56 @@ def main():
     )
     pursuer_0.enable_explore = True
 
-    pursuer_1 = pursuer_0
+    actor = NeuralNetwork(
+        [
+            torch.nn.Linear(num_obs, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 300),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(300, 400),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(400, num_actions),
+        ]
+    )
+    critic = CriticNetwork(
+        layers=[
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(256, 300),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(300, 400),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(400, 1),
+        ],
+        obs_layers=[
+            torch.nn.Linear(num_obs, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 256),
+            torch.nn.LeakyReLU(),
+        ],
+        action_layers=[
+            torch.nn.Linear(num_actions, 256),
+        ],
+    )
+    pursuer_1 = DDPGAgent(
+        env,
+        "pursuer_1",
+        name=agent_name,
+        actor=actor,
+        critic=critic,
+        actor_optimizer_factory=torch.optim.Adam,
+        actor_optimizer_kwargs={"lr": 3e-4},
+        critic_optimizer_factory=torch.optim.Adam,
+        critic_optimizer_kwargs={"lr": 3e-5},
+        criterion_factory=torch.nn.HuberLoss,
+        criterion_kwargs={"reduction": "mean"},
+        actor_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        actor_lr_scheduler_kwargs={"gamma": 0.95},
+        critic_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        critic_lr_scheduler_kwargs={"gamma": 0.999},
+        batch_size=BATCH_SIZE,
+        memory=BATCH_SIZE * 3,
+        gamma=0.99,
+    )
 
     agents = {
         "pursuer_0": pursuer_0,

@@ -7,7 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm.contrib.concurrent import process_map
 
 from agents import A2CAgent, ModuleBuilder, NeuralNetwork
-from agents.distance_neural_network import DistanceNeuralNetwork
 from custom_waterworld import Runner, WaterworldArguments
 from main import record_episode, train
 from run_arguments import RunArguments
@@ -28,7 +27,7 @@ def run(args: tuple) -> None:
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     tensorboard_writer: SummaryWriter | None = None
     tensorboard_writer = SummaryWriter(
-        log_dir=f"runs/{date_time}_{run_args.run_name}_{run_args.num_episodes}its"
+        log_dir=f"runs/{date_time}/{run_args.run_name}_{run_args.num_episodes}its"
     )
     for env_name, agent in agents.items():
         agent_configs = (
@@ -59,7 +58,7 @@ def run(args: tuple) -> None:
             record_episode(
                 runner,
                 record_name=f"recordings/"
-                f"{date_time}_{run_args.run_name}_{run_args.num_episodes}its",
+                f"{date_time}/{run_args.run_name}_{run_args.num_episodes}its",
             )
     finally:
         env.close()

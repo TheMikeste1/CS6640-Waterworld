@@ -279,16 +279,16 @@ class A2CAgent(AbstractAgent):
             (
                 data.state,
                 data.action,
-                data.reward,
                 data.next_state,
                 data.terminated,
                 agent_info,
-            )
+            ),
+            data.reward,
         )
 
     def update(self, batch_size: int = 1):
         self.train()
-        state, _, reward, new_state, _, log_probabilities = self.memory.sample(
+        state, _, new_state, _, log_probabilities, reward = self.memory.sample(
             batch_size
         )
         state = torch.from_numpy(state).to(self.device).unsqueeze(1)

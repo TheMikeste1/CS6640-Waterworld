@@ -256,12 +256,15 @@ class DDPGAgent(AbstractAgent):
                 data.reward,
                 data.next_state,
                 data.terminated,
-            )
+            ),
+            data.reward,
         )
 
     def update(self, batch_size: int = 1):
         self.train()
-        state, action, reward, new_state, terminated = self.memory.sample(batch_size)
+        state, action, new_state, terminated, reward = self.memory.sample(
+            batch_size, use_replacement_on_overflow=False
+        )
         state = torch.from_numpy(state).to(self.device).unsqueeze(1)
         action = torch.from_numpy(action).to(self.device).unsqueeze(1)
         reward = torch.from_numpy(reward).to(self.device).unsqueeze(1).unsqueeze(1)

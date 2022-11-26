@@ -215,16 +215,16 @@ class QNNAgent(AbstractAgent):
             (
                 data.state,
                 data.action,
-                data.reward,
                 data.next_state,
                 data.terminated,
                 agent_info,
-            )
+            ),
+            data.reward,
         )
 
     def update(self, batch_size: int = 1):
         self.train()
-        state, _, reward, new_state, _, action_index = self.memory.sample(batch_size)
+        state, _, new_state, _, action_index, reward = self.memory.sample(batch_size)
         state = torch.from_numpy(state).to(self.device).unsqueeze(1)
         reward = torch.from_numpy(reward).to(self.device).unsqueeze(1)
         new_state = torch.from_numpy(new_state).to(self.device).unsqueeze(1)

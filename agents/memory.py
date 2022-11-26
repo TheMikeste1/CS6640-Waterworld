@@ -12,7 +12,7 @@ class Memory:
         return len(self.buffer)
 
     def __repr__(self):
-        return f"Memory(items={len(self.buffer)}/{self.buffer.maxlen})"
+        return f"{self.__class__}(items={len(self.buffer)}/{self.buffer.maxlen})"
 
     def __str__(self):
         return str(self.buffer)
@@ -27,10 +27,12 @@ class Memory:
         new_buffer.extend(self.buffer)
         self.buffer = new_buffer
 
-    def add(self, experience: tuple):
-        self.buffer.append(experience)
+    def add(self, experience: tuple, reward: float):
+        self.buffer.append((*experience, reward))
 
-    def sample(self, batch_size, zip_by_column=True) -> tuple[np.ndarray, ...]:
+    def sample(
+        self, batch_size, zip_by_column=True, use_replacement_on_overflow: bool = True
+    ) -> tuple[np.ndarray, ...]:
         """
         Returns some random experiences from the memory.
 
@@ -40,15 +42,20 @@ class Memory:
         If we zip by column, we will return ((float, float), (string, string)).
         If we don't zip by column, we will return each experience in its original form:
         ((float, string), (float, string)).
+        :param use_replacement_on_overflow: If we should use replacement when the batch
+        size is larger than the memory size.
 
         :return:
         """
         # If we have less experiences than the batch size
         # we'll need to sample with replacement
-        if batch_size <= len(self.buffer):
+        if use_replacement_on_overflow and batch_size <= len(self.buffer):
             choices = random.sample(self.buffer, k=batch_size)
         else:
-            choices = random.choices(self.buffer, k=batch_size)
+            choices = random.choices(self.buffer, k=min(len(self.buffer), batch_size))
         if zip_by_column:
             choices = zip(*choices)
         return tuple(map(np.array, choices))
+
+    def clear(self):
+        self.buffer.clear()

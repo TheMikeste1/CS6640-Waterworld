@@ -277,6 +277,6 @@ class DDPGAgent(AbstractAgent):
         self._update_targets()
 
         return {
-            "critic_loss": critic_loss,
-            "actor_loss": actor_loss,
+            "critic_loss": critic_loss / batch_size,
+            "actor_loss": actor_loss / batch_size,
         }

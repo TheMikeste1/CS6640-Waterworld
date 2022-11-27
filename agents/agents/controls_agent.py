@@ -42,35 +42,31 @@ class ControlsAgent(AbstractAgent):
 
     def forward(self, obs):
         # Check if food is in view
-        target_obs = obs[..., 2 * self.num_sensors : 3 * self.num_sensors]
-        if target_obs.sum() == self.num_sensors:
-            # Don't move if there is no food unless there is poison
-            start_i = 3 * self.num_sensors + (
-                self.num_sensors if self.speed_features else 0
-            )
-            # Check if poison is in view
-            target_obs = obs[..., start_i : start_i + self.num_sensors]
-            if target_obs.sum() == self.num_sensors:
-                # There's nothing, don't move
-                return (
-                    torch.zeros((*obs.shape[:-1], self.out_features)).to(self.device),
-                    None,
-                )
-            # No food, but poison, move away from it
-            min_index = target_obs.argmin(dim=-1)
-            percent_of_circle = -min_index / self.num_sensors
-            radians = percent_of_circle * 2 * np.pi
-            x = torch.cos(radians)
-            y = torch.sin(radians)
-            actions = torch.stack([x, y], dim=-1)
-            return actions, None
+        food_obs = obs[..., 2 * self.num_sensors : 3 * self.num_sensors]
+        # The location of poison observations depends on if speed features are used
+        start_i = 3 * self.num_sensors + (
+            self.num_sensors if self.speed_features else 0
+        )
+        # Check if poison is in view
+        poison_obs = obs[..., start_i: start_i + self.num_sensors]
+        rows_no_food = torch.all(food_obs == 1.0, dim=-1)
+        rows_no_poison = torch.all(poison_obs == 1.0, dim=-1)
+        rows_only_poison = rows_no_food & ~rows_no_poison
+        rows_nothing = torch.logical_and(rows_no_food, rows_no_poison)
 
-        min_index = target_obs.argmin(dim=-1)
+        # Target food if there's food, otherwise target poison
+        min_index = food_obs.argmin(dim=-1)
+        min_index[rows_only_poison] = poison_obs[rows_only_poison].argmin(dim=-1)
+
         percent_of_circle = min_index / self.num_sensors
+        # If we're targeting poison, we want to turn the opposite direction
+        percent_of_circle[rows_only_poison] += 0.5
+
         radians = percent_of_circle * 2 * np.pi
         x = torch.cos(radians)
         y = torch.sin(radians)
         actions = torch.stack([x, y], dim=-1)
+        actions[rows_nothing] = torch.tensor([0.0, 0.0], device=self.device)
         return actions
 
     @property

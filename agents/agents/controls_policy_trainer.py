@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Callable, Collection, Iterable, TYPE_CHECKING, Union
 
 import numpy as np
@@ -16,6 +17,33 @@ if TYPE_CHECKING:
 
 
 class ControlsPolicyTrainer(ControlsAgent):
+    @dataclass(kw_only=True)
+    class Builder(ControlsAgent.Builder):
+        critic: CriticNetwork.Builder
+        critic_optimizer_factory: Callable[
+            [Iterable[torch.Tensor], ...], torch.optim.Optimizer
+        ]
+        criterion_factory: Union[
+            Callable[[...], torch.nn.Module], Callable[[...], torch.Tensor]
+        ]
+        critic_lr_scheduler_factory: Callable[
+            [torch.optim.Optimizer, ...], AbstractLRScheduler
+        ] = None
+        critic_optimizer_kwargs: dict = None
+        critic_lr_scheduler_kwargs: dict = None
+        criterion_kwargs: dict = None
+        device: str | torch.device = None
+        memory: Memory | int = None
+        batch_size: int = 1
+        rho: float = 0.001
+        should_explore: bool = True
+
+        def build(self, env: pz.AECEnv) -> ControlsPolicyTrainer:
+            kwargs = self.__dict__.copy()
+            kwargs["env"] = env
+            kwargs["critic"] = self.critic.build()
+            return ControlsPolicyTrainer(**kwargs)
+
     def __init__(
         self,
         env: pz.AECEnv,

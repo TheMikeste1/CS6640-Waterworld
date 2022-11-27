@@ -35,6 +35,7 @@ class ControlsAgent(AbstractAgent):
         # If obs is not in batch form, add a batch dimension
         while len(obs.shape) < 3:
             obs = obs.unsqueeze(-2)
+        obs = obs.to(self.device)
         actions, *_ = torch.nn.Module.__call__(self, obs)
 
         return actions, None
@@ -51,7 +52,10 @@ class ControlsAgent(AbstractAgent):
             target_obs = obs[..., start_i : start_i + self.num_sensors]
             if target_obs.sum() == self.num_sensors:
                 # There's nothing, don't move
-                return torch.zeros((*obs.shape[:-1], self.out_features)), None
+                return (
+                    torch.zeros((*obs.shape[:-1], self.out_features)).to(self.device),
+                    None,
+                )
             # No food, but poison, move away from it
             min_index = target_obs.argmin(dim=-1)
             percent_of_circle = -min_index / self.num_sensors
@@ -68,7 +72,6 @@ class ControlsAgent(AbstractAgent):
         y = torch.sin(radians)
         actions = torch.stack([x, y], dim=-1)
         return actions
-
 
     @property
     def in_features(self):

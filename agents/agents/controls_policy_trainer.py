@@ -35,6 +35,7 @@ class ControlsPolicyTrainer(ControlsAgent):
         device: str | torch.device = None
         memory: Memory | int = None
         batch_size: int = 1
+        gamma: float = 0.99
         rho: float = 0.001
         should_explore: bool = True
 
@@ -64,6 +65,7 @@ class ControlsPolicyTrainer(ControlsAgent):
         device: torch.device | str = None,
         memory: Memory | int = None,
         batch_size: int = 1,
+        gamma: float = 0.99,
         rho: float = 0.001,
         should_explore: bool = True,
         name: str = "",
@@ -98,6 +100,7 @@ class ControlsPolicyTrainer(ControlsAgent):
         self.memory = memory
         self.batch_size = batch_size
         self.rho = rho
+        self.gamma = gamma
         self.should_explore = should_explore
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

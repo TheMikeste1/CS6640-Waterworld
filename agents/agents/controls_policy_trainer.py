@@ -125,11 +125,6 @@ class ControlsPolicyTrainer(ControlsAgent):
         # https://github.com/JL321/PolicyGradients-torch/blob/master/PolicyGradients
         # /DDPG.py#L107
         for target_params, current_params in zip(
-            self.target_actor.parameters(), self.actor.parameters()
-        ):
-            target_params.data *= 1 - self.rho
-            target_params.data += self.rho * current_params.data
-        for target_params, current_params in zip(
             self.target_critic.parameters(), self.critic.parameters()
         ):
             target_params.data *= 1 - self.rho
@@ -144,7 +139,7 @@ class ControlsPolicyTrainer(ControlsAgent):
         terminated: torch.Tensor,
     ):
         self.critic_optimizer.zero_grad()
-        target_action = self.target_actor(new_state)
+        target_action = self.forward(new_state)
         target_value = (
             reward
             + terminated * self.gamma * self.target_critic(new_state, target_action)

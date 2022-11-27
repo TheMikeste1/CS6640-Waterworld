@@ -28,7 +28,7 @@ def run(args: tuple) -> None:
 
     tensorboard_writer: SummaryWriter | None = None
     tensorboard_writer = SummaryWriter(
-        log_dir=f"runs/{prepend}{run_args.run_name}_{run_args.num_episodes}its"
+        log_dir=f"runs/{prepend}/{run_args.run_name}_{run_args.num_episodes}its"
     )
     for env_name, agent in agents.items():
         agent_configs = (
@@ -59,7 +59,7 @@ def run(args: tuple) -> None:
             record_episode(
                 runner,
                 record_name=f"recordings/"
-                f"{prepend}{run_args.run_name}_"
+                f"{prepend}/{run_args.run_name}_"
                 f"{run_args.num_episodes}its",
             )
     finally:
@@ -282,7 +282,7 @@ def main():
     NUM_PROCESSES = min(NUM_PROCESSES, len(run_args))
     enumerated_args = [(r, i + 1, prepend) for i, r in enumerate(run_args)]
     multiprocessing.freeze_support()
-    print(f"Starting {len(run_args)} runs with {NUM_PROCESSES} processes")
+    print(f"Starting {len(run_args)} runs with up to {NUM_PROCESSES} processes")
     process_map(run, enumerated_args, max_workers=NUM_PROCESSES, position=0)
     print("Done")
 

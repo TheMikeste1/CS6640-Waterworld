@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Callable, Iterable, Union
 
@@ -179,3 +180,13 @@ class DistanceNeuralNetwork(NeuralNetwork):
         )
 
         return distance_obs, speed_obs, collision_obs
+
+    def clone(self):
+        layers = list(copy.deepcopy(self.layers))
+        distance_layers = self.distance_layers.clone()
+        return DistanceNeuralNetwork(
+            distance_layers=distance_layers,
+            layers=layers,
+            num_sensors=self.num_sensors,
+            speed_features=self.speed_features,
+        )

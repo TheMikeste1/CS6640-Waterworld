@@ -35,7 +35,11 @@ class ControlsAgent(AbstractAgent):
         # If obs is not in batch form, add a batch dimension
         while len(obs.shape) < 3:
             obs = obs.unsqueeze(-2)
+        actions, *_ = torch.nn.Module.__call__(self, obs)
 
+        return actions, None
+
+    def forward(self, obs):
         # Check if food is in view
         target_obs = obs[..., 2 * self.num_sensors : 3 * self.num_sensors]
         if target_obs.sum() == self.num_sensors:
@@ -63,7 +67,8 @@ class ControlsAgent(AbstractAgent):
         x = torch.cos(radians)
         y = torch.sin(radians)
         actions = torch.stack([x, y], dim=-1)
-        return actions, None
+        return actions
+
 
     @property
     def in_features(self):

@@ -253,7 +253,6 @@ class DDPGAgent(AbstractAgent):
             (
                 data.state,
                 data.action,
-                data.reward,
                 data.next_state,
                 data.terminated,
             ),

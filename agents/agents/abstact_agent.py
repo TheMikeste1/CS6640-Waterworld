@@ -43,7 +43,7 @@ class AbstractAgent(ABC, torch.nn.Module):
         pass
 
     def on_train(self) -> float:
-        return 0.0
+        return dict()
 
     @property
     def in_features(self):

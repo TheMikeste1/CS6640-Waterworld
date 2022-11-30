@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Any, Callable, Dict, TYPE_CHECKING
 
 import numpy as np
+import pandas as pd
 import pettingzoo as pz
 from tqdm.auto import tqdm
 
@@ -173,6 +174,59 @@ class Runner:
                     )
                 cached_data.clear()
         return rewards
+
+    def run_episode_with_dataframe(self, train: bool = True) -> (dict, pd.DataFrame):
+        env = self.env
+
+        rewards = defaultdict(list)
+        env.reset()
+        num_agents = env.num_agents
+        self._render()
+
+        df_out = pd.DataFrame(
+            columns=["agent", "i", "state", "action", "reward"]
+        )
+
+        for agent in self.agents.values():
+            agent.eval()
+
+        cached_data = dict()
+        for i, agent_name in enumerate(env.agent_iter(), start=1):
+            obs, reward, terminated, truncated, info = env.last()
+            rewards[agent_name].append(reward)
+            agent = self.agents[agent_name]
+            action, agent_info = agent(obs)
+            action = action.detach().cpu().numpy()
+            action = action.squeeze()  # Remove any extra dimensions
+
+            # If the agent is dead or truncated the only allowed action is None
+            env.step(None if terminated or truncated else action)
+
+            df_out.loc[len(df_out)] = [agent_name, i, obs, action, reward]
+
+            # Cache the data for updates later
+            cached_data[agent_name] = {
+                "state": obs,
+                "action": action,
+                "reward": reward,
+                "terminated": terminated,
+                "truncated": truncated,
+                "info": info,
+                "agent_info": agent_info,
+            }
+            # Once all agents have taken a step, we can render and update
+            if i % num_agents == 0:
+                self._render()
+                for name, data in cached_data.items():
+                    # TODO: Might be able to optimize this
+                    #  by updating using the call to env.last().
+                    #  It's currently fairly expensive, so it would be nice to do.
+                    next_state = env.observe(name)
+                    self._post_step(
+                        training=train, agent_name=name, next_state=next_state, **data
+                    )
+                cached_data.clear()
+        return rewards, df_out
 
     def run_iterations(self, iterations: int, train: bool = True):
         bar = range(iterations)

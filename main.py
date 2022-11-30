@@ -29,7 +29,13 @@ def on_post_train(writer: SummaryWriter, runner, it, agent_trains):
             writer.add_scalar(f"{agent_name}/{key}", value, it)
 
 
-def record_episode(runner: Runner, record_name: str):
+def record_episode(
+    runner: Runner,
+    record_name: str,
+    record_as_gif: bool = False,
+    with_dataframe: bool = False,
+    dataframe_name: str = None,
+):
     # noinspection PyUnresolvedReferences
     env = runner.env.unwrapped.env
     # Run an episode to film
@@ -37,14 +43,26 @@ def record_episode(runner: Runner, record_name: str):
     env.render_mode = WaterworldArguments.RenderMode.RGB.value
 
     width, height = env.pixel_scale, env.pixel_scale
-    visual_writer = custom_waterworld.VideoWriter(env.FPS, width, height, record_name)
-    # visual_writer = custom_waterworld.GIFWriter(env.FPS, "video_name")
+    if record_as_gif:
+        visual_writer = custom_waterworld.GIFWriter(env.FPS, record_name)
+    else:
+        visual_writer = custom_waterworld.VideoWriter(
+            env.FPS, width, height, record_name
+        )
 
     write_callback = lambda _, frame: visual_writer.write(frame)
     runner.on_render += write_callback
 
     try:
-        runner.run_episode(train=False)
+        if with_dataframe:
+            if dataframe_name is None:
+                dataframe_name = re.split("[\\/]", record_name)[-1]
+            _, df = runner.run_episode_with_dataframe(train=False)
+            if not os.path.exists("dataframes"):
+                os.mkdir("dataframes")
+            df.to_csv(f"dataframes/{dataframe_name}.csv")
+        else:
+            runner.run_episode(train=False)
     finally:
         visual_writer.close()
         runner.on_render -= write_callback
@@ -333,6 +351,8 @@ def main():
         record_episode(
             runner,
             record_name=f"recordings/{date_time}_{agent_name}_{ITERATIONS}its",
+            record_as_gif=True,
+            with_dataframe=True,
         )
     except KeyboardInterrupt:
         print("Run interrupted")

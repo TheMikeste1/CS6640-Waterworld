@@ -285,3 +285,4 @@ cython_debug/
 !/models/keep/
 /recordings/*
 !/recordings/keep/
+/frames/

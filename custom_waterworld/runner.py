@@ -237,4 +237,6 @@ class Runner:
             self._on_post_episode(i, rewards)
             if train:
                 self._post_train(i)
+            for agent in self.agents.values():
+                agent.reset()
         self._on_finished_iterations()

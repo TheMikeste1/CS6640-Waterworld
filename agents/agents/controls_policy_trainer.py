@@ -199,3 +199,6 @@ class ControlsPolicyTrainer(ControlsAgent):
         return {
             "critic_loss": critic_loss / batch_size,
         }
+
+    def reset(self):
+        self.critic.reset()

@@ -63,5 +63,8 @@ class AbstractAgent(ABC, torch.nn.Module):
         self.device = args[0]
         return super().to(*args, **kwargs)
 
+    def reset(self):
+        pass
+
 
 AgentBuilder = AbstractAgent.Builder

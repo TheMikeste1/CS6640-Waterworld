@@ -91,3 +91,8 @@ class NeuralNetwork(torch.nn.Module):
     def clone(self):
         layers = list(copy.deepcopy(self.layers))
         return NeuralNetwork(layers)
+
+    def reset(self):
+        for layer in self.layers:
+            if hasattr(layer, "reset"):
+                layer.reset()

@@ -1,4 +1,5 @@
 import os.path
+import re
 from datetime import datetime
 from functools import partial
 
@@ -317,7 +318,7 @@ def main():
     date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     tensorboard_writer: SummaryWriter | None = None
     tensorboard_writer = SummaryWriter(
-        log_dir=f"runs/{date_time}_{agent_name}_{ITERATIONS}its"
+        log_dir=f"runs/{date_time}_{run_name}_{ITERATIONS}its"
     )
     for env_name, agent in agents.items():
         # was_exploring = agent.enable_explore
@@ -350,7 +351,7 @@ def main():
         print("Recording an episode. . .")
         record_episode(
             runner,
-            record_name=f"recordings/{date_time}_{agent_name}_{ITERATIONS}its",
+            record_name=f"recordings/{date_time}_{run_name}_{ITERATIONS}its",
             record_as_gif=True,
             with_dataframe=True,
         )

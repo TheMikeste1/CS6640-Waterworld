@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, Collection, Iterable, TYPE_CHECKING, Union
 
@@ -199,6 +200,7 @@ class DDPGAgent(AbstractAgent):
     ):
         self.critic_optimizer.zero_grad()
         target_action = self.target_actor(new_state)
+        target_action = torch.tanh(target_action)
         target_value = (
             reward
             + terminated * self.gamma * self.target_critic(new_state, target_action)
@@ -282,3 +284,7 @@ class DDPGAgent(AbstractAgent):
             "critic_loss": critic_loss / batch_size,
             "actor_loss": actor_loss / batch_size,
         }
+
+    def reset(self):
+        self.actor.reset()
+        self.critic.reset()

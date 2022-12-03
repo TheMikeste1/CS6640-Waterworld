@@ -252,3 +252,7 @@ class QNNAgent(AbstractAgent):
         if self.lr_scheduler:
             self.lr_scheduler.step()
         return loss.item()
+
+    def reset(self):
+        for pm in self.policy_networks:
+            pm.reset()

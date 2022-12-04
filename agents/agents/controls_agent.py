@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 import numpy as np
@@ -12,6 +13,11 @@ if TYPE_CHECKING:
 
 
 class ControlsAgent(AbstractAgent):
+    @dataclass(kw_only=True)
+    class Builder(AbstractAgent.Builder):
+        def build(self, env: pz.AECEnv) -> ControlsAgent:
+            return ControlsAgent(env, self.env_name, self.name)
+
     def __init__(
         self,
         env: pz.AECEnv,
@@ -48,7 +54,7 @@ class ControlsAgent(AbstractAgent):
             self.num_sensors if self.speed_features else 0
         )
         # Check if poison is in view
-        poison_obs = obs[..., start_i: start_i + self.num_sensors]
+        poison_obs = obs[..., start_i : start_i + self.num_sensors]
         rows_no_food = torch.all(food_obs == 1.0, dim=-1)
         rows_no_poison = torch.all(poison_obs == 1.0, dim=-1)
         rows_only_poison = rows_no_food & ~rows_no_poison

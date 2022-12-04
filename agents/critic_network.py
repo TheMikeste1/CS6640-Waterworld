@@ -51,7 +51,7 @@ class CriticNetwork(NeuralNetwork):
     def forward(self, obs: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         obs = self.obs_layers(obs)
         action = self.action_layers(action)
-        x = obs + action
+        x = torch.cat([obs, action], dim=-1)
         x = self.layers(x)
         return x
 

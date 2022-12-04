@@ -1,0 +1,11 @@
+Controls
+
+For each below, on agent has normal memory and the other has RPM
+QNN Simple 256-64-5
+QNN Distance
+QNN LSTM
+
+DDPG Simple 256-64
+DDPG Distance
+DDPG LSTM
+DDPG w/ CPT

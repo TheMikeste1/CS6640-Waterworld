@@ -1,5 +1,6 @@
 import os.path
 import re
+from collections import OrderedDict
 from datetime import datetime
 from functools import partial
 
@@ -383,7 +384,19 @@ def main():
     cpt_params = torch.load(
         "models/keep/2022-12-03_18-51-03_cpt_normal_memory_pursuer_0_768its.pt"
     )
-    pursuer_0.critic.load_state_dict(cpt_params)
+    critic_params = OrderedDict()
+    target_critic_params = OrderedDict()
+    for key, item in cpt_params.items():
+        if key.startswith("critic"):
+            key = key[len("critic."):]
+            critic_params[key] = item
+        elif key.startswith("target_critic"):
+            key = key[len("target_critic."):]
+            target_critic_params[key] = item
+
+    pursuer_0.critic.load_state_dict(critic_params)
+    pursuer_0.target_critic.load_state_dict(target_critic_params)
+
     # WARNING: This will exit the program
     # agent_effectiveness_test(pursuer_0, 512, BATCH_SIZE)
 
@@ -411,7 +424,21 @@ def main():
         critic_lr_scheduler_kwargs={"gamma": 0.99},
         criterion_factory=torch.nn.MSELoss,
     ).build(env)
-    pursuer_1.critic.load_state_dict(cpt_params)
+    cpt_params = torch.load(
+        "models/keep/2022-12-03_18-51-03_cpt_normal_memory_pursuer_0_768its.pt"
+    )
+    critic_params = OrderedDict()
+    target_critic_params = OrderedDict()
+    for key, item in cpt_params.items():
+        if key.startswith("critic"):
+            key = key[len("critic."):]
+            critic_params[key] = item
+        elif key.startswith("target_critic"):
+            key = key[len("target_critic."):]
+            target_critic_params[key] = item
+
+    pursuer_1.critic.load_state_dict(critic_params)
+    pursuer_1.target_critic.load_state_dict(target_critic_params)
 
     agents = {
         "pursuer_0": pursuer_0,

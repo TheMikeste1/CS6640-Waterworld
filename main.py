@@ -18,11 +18,12 @@ from agents import (
     CriticNetwork,
     DDPGAgent,
     MemoryLSTM,
-    RewardPrioritizedMemory,
+    ModuleBuilder, RewardPrioritizedMemory,
 )
 from assembled_agents import *
 from custom_waterworld import Runner, WaterworldArguments
 from custom_waterworld.runner import REWARDS_TYPE
+from run_builders.ddpg_distance import generate_ddpg_distance
 
 
 def on_post_episode(writer: SummaryWriter, runner, it, rewards, agent_posts):
@@ -208,11 +209,12 @@ def agent_effectiveness_test(agent: AbstractAgent, iterations: int, batch_size: 
 def main():
     ITERATIONS = 512 + 256
     BATCH_SIZE = 2048
-    agent_name = "MAIN_RUN"
+    run_name = "DDPG_Distance_CPT"
     args = WaterworldArguments(
         # FPS=60
         render_mode=WaterworldArguments.RenderMode.NONE,
         max_cycles=512,
+        n_pursuers=2,
         # n_evaders=5 * 3,
         # n_poisons=10 * 3,
     )
@@ -221,61 +223,169 @@ def main():
     num_obs = env.observation_space(env.possible_agents[0]).shape[0]
     num_actions = env.action_space(env.possible_agents[0]).shape[0]
     num_sensors = args.n_sensors
+    speed_features = args.speed_features
     # Create agents
-    actor = NeuralNetwork(
-        [
-            torch.nn.Linear(num_obs, 128),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(128, 300),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(300, 400),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(400, num_actions),
-        ]
-    )
-    critic = CriticNetwork(
+    agent_builder = DistanceNeuralNetwork.Builder(
+        num_sensors=num_sensors,
+        has_speed_features=speed_features,
         layers=[
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 300),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(300, 400),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(400, 1),
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    # out_channels * num_sensors + 2 collision features + 3 speed layers
+                    "in_features": 64 * num_sensors
+                                   + 2
+                                   + num_sensors * (3 if speed_features else 0),
+                    "out_features": 256,
+                },
+            ),
+            torch.nn.LeakyReLU,
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": 256,
+                    "out_features": 64,
+                },
+            ),
+            torch.nn.LeakyReLU,
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": 64,
+                    "out_features": 2,
+                },
+            ),
         ],
+        distance_layers=[
+            ModuleBuilder(
+                torch.nn.BatchNorm1d,
+                kwargs={
+                    # There are 5 distance features
+                    "num_features": 5,
+                },
+            ),
+            ModuleBuilder(
+                torch.nn.Conv1d,
+                kwargs=dict(
+                    in_channels=5,
+                    out_channels=32,
+                    kernel_size=3,
+                    padding=1,
+                ),
+            ),
+            torch.nn.LeakyReLU,
+            ModuleBuilder(
+                torch.nn.Conv1d,
+                kwargs=dict(
+                    in_channels=32,
+                    out_channels=64,
+                    kernel_size=3,
+                    padding=1,
+                ),
+            ),
+            torch.nn.LeakyReLU,
+            ModuleBuilder(
+                torch.nn.BatchNorm1d,
+                kwargs={
+                    "num_features": 64,
+                },
+            ),
+        ],
+    )
+
+    critic_builder = CriticNetwork.Builder(
         obs_layers=[
-            torch.nn.Linear(num_obs, 128),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(128, 256),
-            torch.nn.LeakyReLU(),
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": num_obs,
+                    "out_features": 256,
+                },
+            ),
+            torch.nn.LeakyReLU,
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": 256,
+                    "out_features": 64,
+                },
+            ),
+            torch.nn.LeakyReLU,
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": 64,
+                    "out_features": 64,
+                },
+            ),
         ],
         action_layers=[
-            torch.nn.Linear(num_actions, 256),
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": 2,
+                    "out_features": 64,
+                },
+            ),
+        ],
+        layers=[
+            torch.nn.Tanh,
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": 64 * 2,
+                    "out_features": 64,
+                },
+            ),
+            torch.nn.LeakyReLU,
+            ModuleBuilder(
+                torch.nn.Linear,
+                kwargs={
+                    "in_features": 64,
+                    "out_features": 1,
+                },
+            ),
         ],
     )
 
-    pursuer_0 = DDPGAgent(
-        env,
-        "pursuer_0",
-        name=agent_name,
-        actor=actor,
-        critic=critic,
-        actor_optimizer_factory=torch.optim.Adam,
-        actor_optimizer_kwargs={"lr": 3e-4},
-        critic_optimizer_factory=torch.optim.Adam,
-        critic_optimizer_kwargs={"lr": 3e-5},
-        criterion_factory=torch.nn.HuberLoss,
-        criterion_kwargs={"reduction": "mean"},
-        actor_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-        actor_lr_scheduler_kwargs={"gamma": 0.95},
-        critic_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-        critic_lr_scheduler_kwargs={"gamma": 0.999},
-        batch_size=BATCH_SIZE,
-        memory=BATCH_SIZE * 3,
-        gamma=0.99,
-    )
+    # pursuer_0 = ControlsPolicyTrainer(
+    #     env,
+    #     env_name="pursuer_0",
+    #     name="cpt_normal_memory",
+    #     batch_size=512,
+    #     memory=512 * 3,
+    #     critic=critic_builder.build(),
+    #     critic_optimizer_factory=torch.optim.Adam,
+    #     critic_optimizer_kwargs={"lr": 0.001},
+    #     critic_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+    #     critic_lr_scheduler_kwargs={"gamma": 0.99},
+    #     criterion_factory=torch.nn.MSELoss,
+    # )
 
+    pursuer_0 = DDPGAgent.Builder(
+        env_name="pursuer_0",
+        name="ddpg_distance_normal_memory_cpt",
+        batch_size=512,
+        memory=512 * 3,
+        actor=agent_builder,
+        actor_optimizer_factory=torch.optim.Adam,
+        actor_optimizer_kwargs={"lr": 0.001},
+        actor_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        actor_lr_scheduler_kwargs={"gamma": 0.99},
+        critic=critic_builder,
+        critic_optimizer_factory=torch.optim.Adam,
+        critic_optimizer_kwargs={"lr": 0.001},
+        critic_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
+        critic_lr_scheduler_kwargs={"gamma": 0.99},
+        criterion_factory=torch.nn.MSELoss,
+    ).build(env)
+
+    cpt_params = torch.load(
+        "models/keep/2022-12-03_18-51-03_cpt_normal_memory_pursuer_0_768its.pt"
+    )
+    pursuer_0.critic.load_state_dict(cpt_params)
     # WARNING: This will exit the program
-    # test_agent_effectiveness(pursuer_0, 512, BATCH_SIZE)
+    # agent_effectiveness_test(pursuer_0, 512, BATCH_SIZE)
 
     pursuer_0.should_explore = False
     torchinfo.summary(
@@ -284,56 +394,24 @@ def main():
     pursuer_0.should_explore = True
     pursuer_0.reset()
 
-    actor = NeuralNetwork(
-        [
-            torch.nn.Linear(num_obs, 128),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(128, 300),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(300, 400),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(400, num_actions),
-        ]
-    )
-    critic = CriticNetwork(
-        layers=[
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(256, 300),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(300, 400),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(400, 1),
-        ],
-        obs_layers=[
-            torch.nn.Linear(num_obs, 128),
-            torch.nn.LeakyReLU(),
-            torch.nn.Linear(128, 256),
-            torch.nn.LeakyReLU(),
-        ],
-        action_layers=[
-            torch.nn.Linear(num_actions, 256),
-        ],
-    )
-    pursuer_1 = DDPGAgent(
-        env,
-        "pursuer_1",
-        name=agent_name,
-        actor=actor,
-        critic=critic,
+    pursuer_1 = DDPGAgent.Builder(
+        env_name="pursuer_1",
+        name="ddpg_distance_rpm_cpt",
+        batch_size=512,
+        memory=RewardPrioritizedMemory(512 * 3),
+        actor=agent_builder,
         actor_optimizer_factory=torch.optim.Adam,
-        actor_optimizer_kwargs={"lr": 3e-4},
-        critic_optimizer_factory=torch.optim.Adam,
-        critic_optimizer_kwargs={"lr": 3e-5},
-        criterion_factory=torch.nn.HuberLoss,
-        criterion_kwargs={"reduction": "mean"},
+        actor_optimizer_kwargs={"lr": 0.001},
         actor_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-        actor_lr_scheduler_kwargs={"gamma": 0.95},
+        actor_lr_scheduler_kwargs={"gamma": 0.99},
+        critic=critic_builder,
+        critic_optimizer_factory=torch.optim.Adam,
+        critic_optimizer_kwargs={"lr": 0.001},
         critic_lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-        critic_lr_scheduler_kwargs={"gamma": 0.999},
-        batch_size=BATCH_SIZE,
-        memory=BATCH_SIZE * 3,
-        gamma=0.99,
-    )
+        critic_lr_scheduler_kwargs={"gamma": 0.99},
+        criterion_factory=torch.nn.MSELoss,
+    ).build(env)
+    pursuer_1.critic.load_state_dict(cpt_params)
 
     agents = {
         "pursuer_0": pursuer_0,

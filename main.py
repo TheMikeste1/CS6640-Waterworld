@@ -379,8 +379,8 @@ def main():
         record_episode(
             runner,
             record_name=f"recordings/{date_time}_{run_name}_{ITERATIONS}its",
-            record_as_gif=True,
-            with_dataframe=True,
+            record_as_gif=False,
+            with_dataframe=False,
             explore=False,
         )
     except KeyboardInterrupt:

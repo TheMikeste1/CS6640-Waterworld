@@ -54,13 +54,14 @@ def run(args: tuple) -> None:
 
         # Record an episode
         if run_args.should_record:
-            for agent in runner.agents.values():
-                agent.enable_explore = False
             record_episode(
                 runner,
                 record_name=f"recordings/"
                 f"{prepend}/{run_args.run_name}_"
                 f"{run_args.num_episodes}its",
+                explore=False,
+                with_dataframe=False,
+                record_as_gif=False,
             )
     finally:
         env.close()

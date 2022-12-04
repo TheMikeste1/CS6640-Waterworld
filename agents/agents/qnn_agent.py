@@ -56,7 +56,7 @@ class QNNAgent(AbstractAgent):
         "optimizer",
         "lr_scheduler",
         "device",
-        "enable_explore",
+        "should_explore",
         "epsilon",
         "memory",
         "policy_networks",
@@ -118,7 +118,7 @@ class QNNAgent(AbstractAgent):
         self.device = device
         self.to(self.device)
         self.epsilon = epsilon
-        self.enable_explore = True
+        self.should_explore = True
         self.gamma = gamma
 
     def __call__(self, obs: np.ndarray | torch.Tensor) -> (torch.Tensor, Any):
@@ -127,7 +127,7 @@ class QNNAgent(AbstractAgent):
         # If obs is not in batch form, add a batch dimension
         while len(obs.shape) < 3:
             obs = obs.unsqueeze(-2)
-        if self.enable_explore and np.random.random() < self.epsilon:
+        if self.should_explore and np.random.random() < self.epsilon:
             actions = self._get_random_actions(num_actions=obs.shape[0]).squeeze()
             actions = torch.from_numpy(actions)
             action_values = self._action_to_action_values(actions)

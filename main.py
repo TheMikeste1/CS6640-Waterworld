@@ -277,11 +277,12 @@ def main():
     # WARNING: This will exit the program
     # test_agent_effectiveness(pursuer_0, 512, BATCH_SIZE)
 
-    pursuer_0.enable_explore = False
+    pursuer_0.should_explore = False
     torchinfo.summary(
         pursuer_0, input_size=(BATCH_SIZE, num_obs), device=pursuer_0.device, depth=5
     )
-    pursuer_0.enable_explore = True
+    pursuer_0.should_explore = True
+    pursuer_0.reset()
 
     actor = NeuralNetwork(
         [
@@ -373,7 +374,7 @@ def main():
 
         # Record an episode
         for agent in runner.agents.values():
-            agent.enable_explore = False
+            agent.should_explore = False
         print("Recording an episode. . .")
         record_episode(
             runner,

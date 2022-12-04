@@ -134,7 +134,7 @@ def train(
 
     # Train
     try:
-        runner.run_iterations(iterations)
+        runner.run_iterations(iterations, test_iterations=2, test_interval=2)
     except KeyboardInterrupt as e:
         if verbose:
             print("Run interrupted")
@@ -381,7 +381,7 @@ def main():
             record_name=f"recordings/{date_time}_{run_name}_{ITERATIONS}its",
             record_as_gif=True,
             with_dataframe=True,
-            explore = False,
+            explore=False,
         )
     except KeyboardInterrupt:
         print("Run interrupted")

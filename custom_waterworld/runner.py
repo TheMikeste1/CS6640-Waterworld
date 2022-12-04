@@ -222,9 +222,13 @@ class Runner:
             for agent in self.agents.values():
                 agent.reset()
             if test_iterations > 0 and i % test_interval == 0:
-                rewards = []
-                for j in range(test_iterations):
+                rewards = {
+                    agent_name: []
+                    for agent_name in self.agents.keys()
+                }
+                for _ in range(test_iterations):
                     episode_rewards = self.run_episode(train=False, explore=False)
-
+                    for agent_name, agent_rewards in episode_rewards.items():
+                        rewards[agent_name].append(agent_rewards)
                 self._post_test(i, rewards)
         self._on_finished_iterations()

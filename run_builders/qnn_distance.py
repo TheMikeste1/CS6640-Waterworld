@@ -115,7 +115,7 @@ def generate_qnn_distance(
     run_builder.add_agent_builder(qnn_normal_memory)
 
     qnn_rp_memory = QNNAgent.Builder(
-        env_name="pursuer_0",
+        env_name="pursuer_1",
         name="qnn_distance_rpm",
         batch_size=512,
         memory=RewardPrioritizedMemory(512 * 3),

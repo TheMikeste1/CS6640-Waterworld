@@ -161,7 +161,7 @@ def train(
         )
 
 
-def test_agent_effectiveness(agent: AbstractAgent, iterations: int, batch_size: int):
+def agent_effectiveness_test(agent: AbstractAgent, iterations: int, batch_size: int):
     device = agent.device
     losses = []
     power = 3

@@ -34,7 +34,7 @@ def run(args: tuple) -> None:
         env,
         agents,
         enable_tqdm=True,
-        tqdm_kwargs={"desc": f"Run {run_id}", "position": 1, "leave": True},
+        tqdm_kwargs={"desc": f"Run {run_id}", "position": run_id, "leave": True},
     )
 
     tensorboard_writer: SummaryWriter | None = None

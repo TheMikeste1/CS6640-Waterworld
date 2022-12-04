@@ -31,6 +31,7 @@ class AbstractAgent(ABC, torch.nn.Module):
         self.env_name = env_name
         self.name = name
         self.device = torch.device("cpu")
+        self.should_explore = True
 
     @abstractmethod
     def __call__(self, obs) -> (torch.Tensor, Any):

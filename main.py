@@ -11,9 +11,18 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import custom_waterworld
-from agents import A2CAgent, AbstractAgent, CriticNetwork, DDPGAgent
+from agents import (
+    A2CAgent,
+    AbstractAgent,
+    ControlsPolicyTrainer,
+    CriticNetwork,
+    DDPGAgent,
+    MemoryLSTM,
+    RewardPrioritizedMemory,
+)
 from assembled_agents import *
 from custom_waterworld import Runner, WaterworldArguments
+from custom_waterworld.runner import REWARDS_TYPE
 
 
 def on_post_episode(writer: SummaryWriter, runner, it, rewards, agent_posts):
@@ -30,12 +39,24 @@ def on_post_train(writer: SummaryWriter, runner, it, agent_trains):
             writer.add_scalar(f"{agent_name}/{key}", value, it)
 
 
+def on_post_test(
+    writer: SummaryWriter,
+    runner: Runner,
+    it: int,
+    episode_rewards: dict[str, list[list[float]]],
+):
+    for agent_name, rewards in episode_rewards.items():
+        rewards = [sum(reward) for reward in rewards]
+        writer.add_scalar(f"{agent_name}/test_total_reward", sum(rewards), it)
+
+
 def record_episode(
     runner: Runner,
     record_name: str,
     record_as_gif: bool = False,
     with_dataframe: bool = False,
     dataframe_name: str = None,
+    explore: bool = False,
 ):
     # noinspection PyUnresolvedReferences
     env = runner.env.unwrapped.env
@@ -54,16 +75,21 @@ def record_episode(
     write_callback = lambda _, frame: visual_writer.write(frame)
     runner.on_render += write_callback
 
+    kwargs = {
+        "train": False,
+        "explore": explore,
+    }
+
     try:
         if with_dataframe:
             if dataframe_name is None:
                 dataframe_name = re.split("[\\/]", record_name)[-1]
-            _, df = runner.run_episode_with_dataframe(train=False)
+            _, df = runner.run_episode_with_dataframe(**kwargs)
             if not os.path.exists("dataframes"):
                 os.mkdir("dataframes")
             df.to_csv(f"dataframes/{dataframe_name}.csv")
         else:
-            runner.run_episode(train=False)
+            runner.run_episode(kwargs)
     finally:
         visual_writer.close()
         runner.on_render -= write_callback
@@ -92,6 +118,9 @@ def train(
 
         write_post_train = partial(on_post_train, tensorboard_writer)
         runner.on_post_train += write_post_train
+
+        write_post_test = partial(on_post_test, tensorboard_writer)
+        runner.on_post_test_iterations += write_post_test
 
     if verbose:
         if env.render_mode == WaterworldArguments.RenderMode.HUMAN.value:
@@ -123,6 +152,7 @@ def train(
             tensorboard_writer.close()
             runner.on_post_episode -= write_post_episode
             runner.on_post_train -= write_post_train
+            runner.on_post_test_iterations -= write_post_test
 
     for agent in agents:
         torch.save(
@@ -321,10 +351,6 @@ def main():
         log_dir=f"runs/{date_time}_{run_name}_{ITERATIONS}its"
     )
     for env_name, agent in agents.items():
-        # was_exploring = agent.enable_explore
-        # agent.enable_explore = False
-        # tensorboard_writer.add_graph(agent, torch.rand(size=(num_obs,)))
-        # agent.enable_explore = was_exploring
         agent_configs = (
             f"name: {agent.name},\n"
             f"batch_size: {agent.batch_size},\n"
@@ -354,6 +380,7 @@ def main():
             record_name=f"recordings/{date_time}_{run_name}_{ITERATIONS}its",
             record_as_gif=True,
             with_dataframe=True,
+            explore = False,
         )
     except KeyboardInterrupt:
         print("Run interrupted")

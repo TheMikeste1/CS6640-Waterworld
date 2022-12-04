@@ -457,15 +457,19 @@ def main():
         log_dir=f"runs/{date_time}_{run_name}_{ITERATIONS}its"
     )
     for env_name, agent in agents.items():
-        agent_configs = (
-            f"name: {agent.name},\n"
-            f"batch_size: {agent.batch_size},\n"
-            f"memory: {agent.memory.max_size},\n"
-            f"gamma: {agent.gamma},\n"
-            f"optimizer: {agent.optimizer},\n"
-            f"criterion: {agent.criterion},\n"
-            f"lr_schedule: {agent.lr_scheduler},\n"
-        )
+        agent_configs = f"name: {agent.name},\n"
+        if hasattr(agent, "batch_size"):
+            agent_configs += f"batch_size: {agent.batch_size},\n"
+        if hasattr(agent, "memory"):
+            agent_configs += f"memory: {len(agent.memory)},\n"
+        if hasattr(agent, "gamma"):
+            agent_configs += f"gamma: {agent.gamma},\n"
+        if hasattr(agent, "optimizer"):
+            agent_configs += f"optimizer: {agent.optimizer},\n"
+        if hasattr(agent, "criterion"):
+            agent_configs += f"criterion: {agent.criterion},\n"
+        if hasattr(agent, "lr_scheduler"):
+            agent_configs += f"lr_scheduler: {agent.lr_scheduler},\n"
         tensorboard_writer.add_text(f"{env_name}/config", agent_configs)
 
     try:

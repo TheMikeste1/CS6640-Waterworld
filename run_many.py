@@ -1,15 +1,22 @@
 import multiprocessing
 from datetime import datetime
 
-import torch.optim
 from pettingzoo.sisl import waterworld_v4 as waterworld
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.contrib.concurrent import process_map
 
-from agents import A2CAgent, DDPGAgent, ModuleBuilder, NeuralNetwork
 from custom_waterworld import Runner, WaterworldArguments
 from main import record_episode, train
 from run_arguments import RunArguments
+from run_builders.controls import generate_controls_run
+from run_builders.ddpg_distance import generate_ddpg_distance
+from run_builders.ddpg_distance_lstm import generate_ddpg_distance_lstm
+from run_builders.ddpg_simple import generate_ddpg_simple
+from run_builders.ddpg_simple_lstm import generate_ddpg_simple_lstm
+from run_builders.qnn_distance import generate_qnn_distance
+from run_builders.qnn_distance_lstm import generate_qnn_distance_lstm
+from run_builders.qnn_simple import generate_qnn_simple
+from run_builders.qnn_simple_lstm import generate_qnn_simple_lstm
 
 
 def run(args: tuple) -> None:
@@ -72,220 +79,36 @@ def run(args: tuple) -> None:
 def main():
     NUM_PROCESSES = 4
 
-    run_args: [RunArguments] = []
-    run_builder = RunArguments.Builder()
-    run_builder.set_num_episodes(2048).set_should_record(False)
 
-    for num_sensors in range(1, 31):
-        run_builder.set_run_name(f"waterworld_{num_sensors}_sensors")
-        run_builder.set_environment_args(
-            WaterworldArguments(
-                max_cycles=256,
-                n_sensors=num_sensors,
-            )
-        ).set_agent_builders([])
+    num_episodes = 256
+    should_record = False
+    env_args = WaterworldArguments(
+        render_mode=WaterworldArguments.RenderMode.NONE,
+        max_cycles=512,
+    )
+    run_args: [RunArguments] = [
+        generate_controls_run(num_episodes, env_args, should_record),
 
-        agent_builder = A2CAgent.Builder(
-            env_name="pursuer_0",
-            name=f"A2C_{num_sensors}",
-            shared_network=NeuralNetwork.Builder(
-                layers=[
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 8 * num_sensors + 2,
-                            "out_features": (8 * num_sensors + 2) * 2,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": (8 * num_sensors + 2) * 2,
-                            "out_features": 512,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 512,
-                        },
-                    ),
-                ],
-            ),
-            advantage_network=NeuralNetwork.Builder(
-                layers=[
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 512,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 256,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 256,
-                            "out_features": 1,
-                        },
-                    ),
-                ],
-            ),
-            policy_networks=NeuralNetwork.Builder(
-                layers=[
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 512,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 256,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 256,
-                            "out_features": 8,
-                        },
-                    ),
-                ],
-            ),
-            optimizer_factory=torch.optim.Adam,
-            optimizer_kwargs={"lr": 0.0001},
-            criterion_factory=torch.nn.HuberLoss,
-            criterion_kwargs={"reduction": "mean"},
-            lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-            lr_scheduler_kwargs={"gamma": 0.999},
-            gamma=0.99,
-            batch_size=128,
-            memory=2048,
-        )
-        run_builder.add_agent_builder(agent_builder)
+        generate_qnn_simple(num_episodes, env_args, should_record),
+        generate_qnn_simple_lstm(num_episodes, env_args, should_record),
+        generate_qnn_distance(num_episodes, env_args, should_record),
+        generate_qnn_distance_lstm(num_episodes, env_args, should_record),
 
-        agent_builder = A2CAgent.Builder(
-            env_name="pursuer_1",
-            name=f"A2C_{num_sensors}",
-            shared_network=NeuralNetwork.Builder(
-                layers=[
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 8 * num_sensors + 2,
-                            "out_features": (8 * num_sensors + 2) * 2,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": (8 * num_sensors + 2) * 2,
-                            "out_features": 512,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 512,
-                        },
-                    ),
-                ],
-            ),
-            advantage_network=NeuralNetwork.Builder(
-                layers=[
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 512,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 256,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 256,
-                            "out_features": 1,
-                        },
-                    ),
-                ],
-            ),
-            policy_networks=NeuralNetwork.Builder(
-                layers=[
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 512,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 512,
-                            "out_features": 256,
-                        },
-                    ),
-                    torch.nn.ReLU,
-                    ModuleBuilder(
-                        torch.nn.Linear,
-                        kwargs={
-                            "in_features": 256,
-                            "out_features": 8,
-                        },
-                    ),
-                ],
-            ),
-            optimizer_factory=torch.optim.Adam,
-            optimizer_kwargs={"lr": 0.0001},
-            criterion_factory=torch.nn.HuberLoss,
-            criterion_kwargs={"reduction": "mean"},
-            lr_scheduler_factory=torch.optim.lr_scheduler.ExponentialLR,
-            lr_scheduler_kwargs={"gamma": 0.999},
-            gamma=0.99,
-            batch_size=128,
-            memory=2048,
-        )
-        run_builder.add_agent_builder(agent_builder)
-        args = run_builder.build()
-        run_args.append(args)
+        generate_ddpg_simple(num_episodes, env_args, should_record),
+        generate_ddpg_simple_lstm(num_episodes, env_args, should_record),
+        generate_ddpg_distance(num_episodes, env_args, should_record),
+        generate_ddpg_distance_lstm(num_episodes, env_args, should_record),
+    ]
 
-    prepend = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    NUM_PROCESSES = min(NUM_PROCESSES, len(run_args))
+    now = datetime.now()
+    prepend = now.strftime("%Y-%m-%d_%H-%M-%S")
     enumerated_args = [(r, i + 1, prepend) for i, r in enumerate(run_args)]
     multiprocessing.freeze_support()
     print(f"Starting {len(run_args)} runs with up to {NUM_PROCESSES} processes")
     process_map(run, enumerated_args, max_workers=NUM_PROCESSES, position=0)
-    print("Done")
+
+    time_elapsed = datetime.now() - now
+    print(f"Done after {time_elapsed}")
 
 
 if __name__ == "__main__":

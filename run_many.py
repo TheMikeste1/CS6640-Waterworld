@@ -8,6 +8,10 @@ from tqdm.contrib.concurrent import process_map
 from custom_waterworld import Runner, WaterworldArguments
 from main import record_episode, train
 from run_arguments import RunArguments
+from run_builders.a2c_distance import generate_a2c_distance
+from run_builders.a2c_distance_lstm import generate_a2c_distance_lstm
+from run_builders.a2c_simple import generate_a2c_simple
+from run_builders.a2c_simple_lstm import generate_a2c_simple_lstm
 from run_builders.controls import generate_controls_run
 from run_builders.ddpg_distance import generate_ddpg_distance
 from run_builders.ddpg_distance_lstm import generate_ddpg_distance_lstm
@@ -103,6 +107,11 @@ def main():
         generate_ddpg_simple_lstm(num_episodes, env_args, should_record),
         generate_ddpg_distance(num_episodes, env_args, should_record),
         generate_ddpg_distance_lstm(num_episodes, env_args, should_record),
+
+        generate_a2c_simple(num_episodes, env_args, should_record),
+        generate_a2c_simple_lstm(num_episodes, env_args, should_record),
+        generate_a2c_distance(num_episodes, env_args, should_record),
+        generate_a2c_distance_lstm(num_episodes, env_args, should_record),
     ]
 
     now = datetime.now()
